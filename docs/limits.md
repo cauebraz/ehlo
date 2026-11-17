@@ -41,7 +41,7 @@ With every day clean and fully used, a lane goes from 50 to 100,000 a day in 19 
 
 ## API
 
-`GET /v1/limits/{source}/{provider}` returns one lane. `GET /v1/limits` returns `{"lanes": [...], "server_time": ...}`, filtered by `?source=` and `?provider=`.
+`GET /v1/limits/{source}/{provider}` returns one lane. `GET /v1/limits` returns `{"lanes": [...], "server_time": ...}`, filtered by `?source=` and `?provider=`. The list holds only lanes that exist: a lane appears after its first event, or after its first `GET /v1/limits/{source}/{provider}` when the source is in the config.
 
 ```
 {
@@ -71,12 +71,12 @@ The endpoint creates a lane for a source listed in `sources`, `targets.sources` 
 
 Before each batch, for each provider in the batch:
 
-1. Ask every candidate source: `GET /v1/limits?provider=gmail` returns all lanes toward Gmail in one call.
+1. Ask every candidate source, one call each: `GET /v1/limits/{source}/gmail`. Do not use `GET /v1/limits?provider=gmail` here: it lists only lanes that already exist, so a new source is missing from it and never gets traffic.
 2. Give each source at most `floor(allowed_now)` messages. A source with 0 gets none.
 3. Put what no source can take back in the queue, or send it through an ESP route.
 4. Send, and let the adapters report the attempts. `sent` grows as the attempt events arrive, so ask again for the next batch instead of keeping a local count.
 
-The demo simulator (`internal/sim`) routes its traffic this way: it splits each provider's volume across sources in proportion to their limits, capped by `allowed_now`, and spreads the overflow over the sources with room left.
+The demo simulator (`internal/sim`) routes its traffic this way: it asks `GET /v1/limits/{source}/{provider}` for each of its sources, splits each provider's volume across sources in proportion to their limits, capped by `allowed_now`, and spreads the overflow over the sources with room left.
 
 A lane that just started on a new source has little room. On its first day toward Gmail, `limit` is 50 and the hourly limit is 50 / 16 = 3.125, so the lane may send 3 messages an hour. After those 3, `allowed_now` is 0.125, which rounds down to 0 until `next_hour_at`:
 

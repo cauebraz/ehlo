@@ -74,7 +74,7 @@ ehlo needs to know each sending server, called a source, and the daily volume it
 
 ## Ask before sending
 
-ehlo does not hold mail back. To pace a warmup, the code that picks a source for each batch asks `GET /v1/limits?provider=<provider>`, gives each source at most `allowed_now` messages, and queues the rest or sends it through an ESP. [limits.md](limits.md#from-a-sender) shows the loop and every field. Skip this step to use ehlo for monitoring only.
+ehlo does not hold mail back. To pace a warmup, the code that picks a source for each batch asks `GET /v1/limits/{source}/{provider}` for each candidate source, gives each source at most `allowed_now` messages, and queues the rest or sends it through an ESP. [limits.md](limits.md#from-a-sender) shows the loop and every field. Skip this step to use ehlo for monitoring only.
 
 ## Monitor
 
