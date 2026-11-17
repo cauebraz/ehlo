@@ -14,6 +14,13 @@ $ curl -s localhost:8080/v1/limits/mx-1/gmail
 {"source":"mx-1","provider":"gmail","state":"at_target","allowed_now":103978,"limit":110000,"sent":6022,...}
 ```
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/dashboards/ehlo-gmail-dark.png">
+  <img alt="Gmail dashboard while Gmail rate limits two of four servers" src="docs/images/dashboards/ehlo-gmail.png">
+</picture>
+
+The Gmail dashboard while Gmail rate limits two of four servers. [All nine dashboards](docs/dashboards.md).
+
 ## Who it is for
 
 Teams that run their own mail servers (Postfix or another MTA) or send through SES or SendGrid, and need to:

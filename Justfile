@@ -41,6 +41,10 @@ chart-e2e:
 classic:
     scripts/export-classic.sh
 
+# Render every dashboard to docs/images/dashboards from a throwaway stack: steady for 10 min, then the scenario for 20 min
+screenshots scenario="gmail-throttle":
+    scripts/screenshots.sh -scenario {{scenario}}
+
 # The check job CI runs: gofmt, tidy, vet, race tests, generated dashboard, promtool, compose config
 check:
     ./scripts/check.sh

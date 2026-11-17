@@ -89,7 +89,7 @@ The dashboards use the Grafana dashboard schema v2 (`apiVersion: dashboard.grafa
 | Gmail, Microsoft, Yahoo | That provider's reply codes and published thresholds |
 | Reply codes | What each reply means and what to do |
 
-[alerts.md](alerts.md) explains each alert.
+[dashboards.md](dashboards.md) has a screenshot of each one. [alerts.md](alerts.md) explains each alert.
 
 ## Security
 

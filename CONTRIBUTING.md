@@ -12,6 +12,7 @@ just smoke    # the CI smoke job: every dashboard panel returns data
 just chart    # the CI chart job: helm lint, template and kubeconform
 just chart-e2e  # the chart on a throwaway kind cluster with kube-prometheus-stack
 just classic  # classic (v1) dashboards, imported into Grafana 12.4 and 13.3
+just screenshots  # docs/images/dashboards from a throwaway stack, about 35 minutes
 ```
 
 Run `just check` and `just lint` before a pull request. If you changed the server, the simulator, a panel or a rule, also run `just up` and `just smoke`.
@@ -45,7 +46,7 @@ prometheus/tests   promtool tests of the default render, a -group-by cluster ren
 | Change | Steps |
 |--------|-------|
 | Metric | Add it in `internal/metrics` and to `docs/metrics.md`. Labels take a small, fixed set of values: never a recipient, message ID or domain |
-| Panel | Add it in `monitoring` (`dashboard.go`, `providers.go` or `codes.go`), then `just dashboard`. Never edit the JSON. Tests fail if a panel queries a metric that does not exist, if a title or subtitle does not fit the narrowest column its auto grid allows, or if a gauge is not taken once per source or lane (`max by`) |
+| Panel | Add it in `monitoring` (`dashboard.go`, `providers.go` or `codes.go`), then `just dashboard`, and `just screenshots` when the dashboard looks different. Never edit the JSON. Tests fail if a panel queries a metric that does not exist, if a title or subtitle does not fit the narrowest column its auto grid allows, or if a gauge is not taken once per source or lane (`max by`) |
 | Alert | Add it to `monitoring/rules.go`, then `just dashboard`. Add a test case to `prometheus/tests/ehlo-alerts.test.yml` and a section to `docs/alerts.md` |
 | SMTP reply pattern | Add it to `internal/classify` with a test using the provider's real reply text. New token format: a row in `docs/metrics.md`. Code shown on a chart: an entry in `codeNotes` in `monitoring/codes.go` |
 | Warmup policy key | Add it to `internal/warmup/policy.go` with a default in `DefaultPolicy`, a validation rule, a test, and a row in `docs/limits.md` |

@@ -66,5 +66,6 @@ docker run --rm --user "$(id -u):$(id -g)" -v "$variant:/work:ro" -w /work --ent
 
 step "compose config"
 GRAFANA_ADMIN_PASSWORD=check docker compose config --quiet
+GRAFANA_ADMIN_PASSWORD=check RENDERER_TOKEN=check docker compose -f compose.yaml -f compose.screenshots.yaml config --quiet
 
 printf '\nall checks passed\n'

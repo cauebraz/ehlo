@@ -1,0 +1,39 @@
+services:
+  ehlo:
+    ports: !reset []
+
+  ehlo-sim:
+    command:
+      - -target=http://ehlo:8080
+      - -scenario=${EHLO_SCENARIO:-steady}
+      - -speed=${EHLO_SPEED:-60}
+      - -sources=mx-1,mx-2,mx-3,mx-4
+      - -daily=300000
+
+  prometheus:
+    ports: !reset []
+
+  grafana:
+    ports: !override ["127.0.0.1::3000"]
+    environment:
+      GF_RENDERING_SERVER_URL: http://renderer:8081/render
+      GF_RENDERING_CALLBACK_URL: http://grafana:3000/
+      GF_RENDERING_RENDERER_TOKEN: ${RENDERER_TOKEN:?scripts/screenshots.sh sets RENDERER_TOKEN}
+    depends_on:
+      renderer:
+        condition: service_healthy
+
+  renderer:
+    image: grafana/grafana-image-renderer:v5.12.11@sha256:cfa6c8f63e6d626f90208f2880f15bd5facc279daec1b9bb642af07aa850d95e
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      AUTH_TOKEN: ${RENDERER_TOKEN:?scripts/screenshots.sh sets RENDERER_TOKEN}
+      BROWSER_MAX_HEIGHT: "-1"
+    tmpfs: [/tmp, /home/nonroot]
+    healthcheck:
+      test: ["CMD", "/usr/bin/grafana-image-renderer", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
