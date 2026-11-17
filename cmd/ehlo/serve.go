@@ -55,7 +55,8 @@ func serve(ctx context.Context, args []string) error {
 	}
 	pipeline := ingest.New(cls, m, eng, ingest.WithRoutes(cfg.Routes), ingest.WithSources(cfg.MaxSources, seenSources(cfg, eng)))
 	srv := server.New(pipeline, eng, reg, opts...)
-	httpSrv := newHTTPServer(cfg, srv.Handler())
+	handlers := &inflight{}
+	httpSrv := newHTTPServer(cfg, handlers.wrap(srv.Handler()))
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -72,8 +73,23 @@ func serve(ctx context.Context, args []string) error {
 		return fmt.Errorf("listen %s: %w", cfg.Listen, err)
 	case <-ctx.Done():
 	}
-	return shutdown(httpSrv, errc, &wg, eng, store)
+	return shutdown(httpSrv, errc, &wg, eng, store, handlers, shutdownTimeout)
 }
+
+// inflight tracks running handlers, so shutdown can wait for every one of
+// them, even after it closed their connections.
+type inflight struct{ mu sync.RWMutex }
+
+func (f *inflight) wrap(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		f.mu.RLock()
+		defer f.mu.RUnlock()
+		h.ServeHTTP(w, r)
+	})
+}
+
+// wait returns once no handler runs. Handlers that start later block.
+func (f *inflight) wait() { f.mu.Lock() }
 
 // newHTTPServer bounds every connection: header size, read, write and idle
 // time.
@@ -198,12 +214,19 @@ func saveSnapshot(eng *warmup.Engine, store warmup.Store, m *metrics.Metrics) {
 	}
 }
 
-// shutdown stops accepting requests, waits for the snapshot loop, saves the
-// lanes one last time and reports every error at once.
-func shutdown(httpSrv *http.Server, errc <-chan error, wg *sync.WaitGroup, eng *warmup.Engine, store warmup.Store) error {
-	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+// shutdown stops accepting requests and gives them timeout to finish, then
+// closes the rest, so a slow body upload records nothing. It waits for
+// every handler and the snapshot loop before the last save, so the
+// snapshot holds each batch whole or not at all, and reports every error
+// at once.
+func shutdown(httpSrv *http.Server, errc <-chan error, wg *sync.WaitGroup, eng *warmup.Engine, store warmup.Store, handlers *inflight, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	err := httpSrv.Shutdown(ctx)
+	if err != nil {
+		err = errors.Join(err, httpSrv.Close())
+	}
+	handlers.wait()
 	wg.Wait()
 	if saveErr := store.Save(eng.Snapshot()); saveErr != nil {
 		err = errors.Join(err, saveErr)

@@ -70,7 +70,7 @@ ehlo-monitoring render -config monitoring.yaml -format all -out monitoring
 kubectl apply --server-side -f monitoring/kubernetes/prometheusrule.yaml -f monitoring/kubernetes/dashboards-configmaps.yaml
 ```
 
-The chart selects PrometheusRules and the sidecar selects ConfigMaps by label; both labels above match its defaults. The sidecar reads only keys that end in `.json`.
+kube-prometheus-stack selects PrometheusRules and its Grafana sidecar selects ConfigMaps by label; both labels above match its defaults. The sidecar reads only keys that end in `.json`.
 
 Mimir or Grafana Cloud with several clusters in one tenant:
 

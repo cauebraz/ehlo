@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -305,4 +306,52 @@ func (l *lockedPoster) sizes() []int {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return slices.Clone(l.fp.sizes)
+}
+
+type handlerCheckStore struct {
+	countingStore
+	returned       *atomic.Bool
+	returnedAtSave bool
+}
+
+func (s *handlerCheckStore) Save(snap warmup.Snapshot) error {
+	s.returnedAtSave = s.returned.Load()
+	return s.countingStore.Save(snap)
+}
+
+func TestShutdownWaitsForHandlersBeforeTheLastSave(t *testing.T) {
+	eng, err := warmup.New(warmup.DefaultPolicy(), warmup.Targets{Default: 1000}, []string{"gmail", "other"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var returned atomic.Bool
+	started := make(chan struct{})
+	handlers := &inflight{}
+	h := handlers.wrap(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		close(started)
+		defer returned.Store(true)
+		_, _ = io.ReadAll(r.Body)
+	}))
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	httpSrv := &http.Server{Handler: h, ReadHeaderTimeout: 5 * time.Second}
+	errc := make(chan error, 1)
+	go func() { errc <- httpSrv.Serve(ln) }()
+	conn, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close() }()
+	if _, err := fmt.Fprint(conn, "POST /v1/events HTTP/1.1\r\nHost: x\r\nContent-Length: 100\r\n\r\n0123456789"); err != nil {
+		t.Fatal(err)
+	}
+	<-started
+	store := &handlerCheckStore{returned: &returned}
+	var wg sync.WaitGroup
+	_ = shutdown(httpSrv, errc, &wg, eng, store, handlers, 100*time.Millisecond)
+	if store.count() != 1 || !store.returnedAtSave {
+		t.Errorf("saves = %d, handler returned before the last save = %v, want one save after the handler", store.count(), store.returnedAtSave)
+	}
 }

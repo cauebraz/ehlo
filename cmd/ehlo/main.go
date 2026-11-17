@@ -34,7 +34,7 @@ func buildVersion() string {
 const usage = `usage: ehlo <command> [flags]
 
 commands:
-  serve         run the server: POST /v1/events, GET /v1/limits, GET /metrics
+  serve         run the server: POST /v1/events, POST /v1/webhooks/{ses,sendgrid,kumomta}, GET /v1/limits, GET /metrics, GET /healthz
   tail-postfix  read Postfix log lines from stdin or a file and post them as events
   probe         GET a URL and exit 0 on HTTP 200 (container health check)
   version       print the version

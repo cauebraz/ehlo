@@ -34,7 +34,7 @@ internal/metrics   Prometheus metrics
 internal/ingest    classify, validate, record: the path of every event
 internal/server    HTTP handlers
 internal/client    HTTP client for the tailer and the simulator
-internal/adapters  Postfix, SES, SendGrid
+internal/adapters  Postfix, KumoMTA, SES, SendGrid
 internal/sim       traffic generator behind ehlo-sim
 monitoring         Grafana dashboards and Prometheus rules, written in Go (public package, API v0)
 prometheus/rules   generated recording rules and alerts
