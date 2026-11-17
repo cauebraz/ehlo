@@ -18,6 +18,8 @@ func TestValidate(t *testing.T) {
 		{"attempt bad kind", Event{Type: Attempt, Time: now, Source: "a", Attempt: "third"}, false},
 		{"reply 250", Event{Type: Reply, Time: now, Source: "a", Code: 250, Enhanced: "2.0.0"}, true},
 		{"reply connect without code", Event{Type: Reply, Time: now, Source: "a", Stage: StageConnect}, true},
+		{"reply unknown stage", Event{Type: Reply, Time: now, Source: "a", Code: 421, Stage: "bogus"}, false},
+		{"reply rcpt stage", Event{Type: Reply, Time: now, Source: "a", Code: 421, Stage: StageRcpt}, true},
 		{"reply code 199", Event{Type: Reply, Time: now, Source: "a", Code: 199}, false},
 		{"reply code 354", Event{Type: Reply, Time: now, Source: "a", Code: 354}, false},
 		{"reply code 399", Event{Type: Reply, Time: now, Source: "a", Code: 399}, false},

@@ -163,8 +163,11 @@ func (p Policy) Validate() error {
 	if p.HoldComplaintRatio <= 0 || p.PauseComplaintRatio <= p.HoldComplaintRatio {
 		fail("pause_complaint_ratio must be above hold_complaint_ratio, both positive")
 	}
-	if p.HoldBounceRatio <= 0 {
-		fail("hold_bounce_ratio must be positive")
+	if p.HoldComplaintRatio > 1 || p.PauseComplaintRatio > 1 {
+		fail("hold_complaint_ratio and pause_complaint_ratio must be at most 1")
+	}
+	if p.HoldBounceRatio <= 0 || p.HoldBounceRatio > 1 {
+		fail("hold_bounce_ratio must be in (0, 1]")
 	}
 	if p.MinSample < 1 {
 		fail("min_sample must be at least 1")

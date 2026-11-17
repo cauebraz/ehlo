@@ -28,6 +28,19 @@ func TestLoadDefaults(t *testing.T) {
 	}
 }
 
+func TestLoadEmptyFileKeepsDefaults(t *testing.T) {
+	for _, body := range []string{"", "# only a comment\n"} {
+		c, err := Load(write(t, body))
+		if err != nil {
+			t.Errorf("load %q: %v, want the defaults", body, err)
+			continue
+		}
+		if c.Listen != ":8080" || c.Warmup.StartLimit != 50 {
+			t.Errorf("load %q = %+v, want the defaults", body, c)
+		}
+	}
+}
+
 func TestLoadOverridesAndKeepsDefaults(t *testing.T) {
 	p := write(t, `
 listen: ":9000"

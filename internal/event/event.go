@@ -47,6 +47,11 @@ const (
 	StageData    Stage = "data"
 )
 
+// Stages lists every stage, in session order.
+func Stages() []Stage {
+	return []Stage{StageConnect, StageEHLO, StageTLS, StageMail, StageRcpt, StageData}
+}
+
 // ConnectionLevel reports whether the session ended before MAIL FROM.
 func (s Stage) ConnectionLevel() bool {
 	return s == StageConnect || s == StageEHLO || s == StageTLS
@@ -239,6 +244,9 @@ func (e *Event) Validate() error {
 		}
 		if e.Tag != "" && !ValidTag(e.Tag) {
 			return fmt.Errorf("%w: tag %q", ErrInvalid, e.Tag)
+		}
+		if e.Stage != "" && !slices.Contains(Stages(), e.Stage) {
+			return fmt.Errorf("%w: stage %q", ErrInvalid, e.Stage)
 		}
 		if e.Stage.ConnectionLevel() {
 			break

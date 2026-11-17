@@ -16,7 +16,7 @@ ehlo keeps one lane per source and provider. Each lane has a daily limit that gr
 | Clean day | A closed day that raises the limit: below the target, at least `grow_when_used` (70%) of the limit sent, and no pause, block, backoff, complaint hold or bounce hold |
 | Last good limit | The limit of the last clean day, or the target once reached. When a lane pauses, the limit of the day that paused it. Pauses and blocks resume at half of it |
 
-With `targets.default: 200000` and `mix: {gmail: 0.55, outlook: 0.20, yahoo: 0.10}`, every lane toward Gmail has a target of 110,000, and every lane toward another provider, such as `icloud`, 30,000. A source with no target is unmanaged: it gets metrics and alerts, and `/v1/limits` answers 404 with `managed: false`.
+With `targets.default: 200000` and `mix: {gmail: 0.55, outlook: 0.20, yahoo: 0.10}`, every lane toward Gmail has a target of 110,000, and every lane toward another provider, such as `icloud`, 30,000. A source with no target is unmanaged: it gets metrics and alerts, and `/v1/limits` answers 404 with `managed: false`. So is a lane whose target is 0, such as a provider outside a `mix` that sums to 1.
 
 The built-in provider names, as `GET /v1/limits/{source}/{provider}` and `?provider=` take them: `gmail`, `outlook`, `yahoo`, `icloud`, `comcast`, `spectrum`, `cox`, `orange`, `sfr`, `free`, `laposte`, `gmx`, `t-online`, `libero`, `mail.ru`, `yandex`, `seznam`, `proton`, `fastmail`, `zoho`, `qq`, `netease`, `naver`, `kakao`, `uol`, `terra`, `movistar` and `other`. `providers` and `providers_extra` change the set. A sender maps each recipient domain to one of these names the same way ehlo does; `internal/provider/provider.go` lists the domains.
 
@@ -104,7 +104,7 @@ $ curl -s localhost:8080/v1/limits/mx-5/gmail
 
 ## Configuration
 
-All keys are optional. Unknown keys fail the start, and so do `growth`, `shaping` or `mix` entries that name no provider and negative targets.
+All keys are optional, and an empty file gives the defaults. Unknown keys fail the start, and so do `growth`, `shaping` or `mix` entries that name no provider and negative targets.
 
 `warmup:`
 
@@ -113,8 +113,8 @@ All keys are optional. Unknown keys fail the start, and so do `growth`, `shaping
 | `start_limit` | 50 | First limit of a new lane |
 | `growth` | default 1.4, gmail 1.5, outlook 1.3, yahoo 1.35 | Daily multiplier per provider |
 | `grow_when_used` | 0.7 | Share of the limit a lane must send to grow. 0 grows on any clean day |
-| `hold_complaint_ratio`, `pause_complaint_ratio` | 0.001, 0.003 | Complaints over deliveries that hold or pause |
-| `hold_bounce_ratio` | 0.03 | Bounces over first attempts that hold |
+| `hold_complaint_ratio`, `pause_complaint_ratio` | 0.001, 0.003 | Complaints over deliveries that hold or pause. Pause above hold, both at most 1 |
+| `hold_bounce_ratio` | 0.03 | Bounces over first attempts that hold, at most 1 |
 | `hold_complaints`, `pause_complaints` | 2, 3 | Daily complaint counts that hold or pause below `min_sample` |
 | `min_sample` | 50 | Deliveries in the window before the complaint ratios apply, and first attempts before the bounce ratio applies |
 | `trailing_days` | 3 | Closed days the ratios cover, 1-14 |
@@ -163,6 +163,6 @@ Top level:
 | Command | Flags |
 |---------|-------|
 | `ehlo serve` | `-config`, and `-listen`, `-state`, `-day-length` to override the file |
-| `ehlo tail-postfix` | `-source` (required), `-target` (`http://127.0.0.1:8080`), `-file` (`-` for stdin), `-batch` (200, at most 10,000), `-flush` (2s), `-tz` (`Local`), `-retry-after` (1m), `-skip-relay` (comma-separated hosts, each `host`, `host:port` or `[host]:port`) |
+| `ehlo tail-postfix` | `-source` (required), `-target` (`http://127.0.0.1:8080`), `-file` (`-` for stdin), `-batch` (200, at most 10,000), `-flush` (2s, above 0), `-tz` (`Local`), `-retry-after` (1m), `-skip-relay` (comma-separated hosts, each `host`, `host:port` or `[host]:port`) |
 | `ehlo probe <url>` | Exits 0 on HTTP 200. `-timeout` (3s) |
 | `ehlo version` | |

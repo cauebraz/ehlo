@@ -129,6 +129,9 @@ func tailPostfix(ctx context.Context, args []string) error {
 	if *source == "" {
 		return errors.New("-source is required")
 	}
+	if *flush <= 0 {
+		return errors.New("-flush must be positive")
+	}
 	if *batch < 1 || *batch > event.MaxBatch {
 		return fmt.Errorf("-batch must be between 1 and %d", event.MaxBatch)
 	}

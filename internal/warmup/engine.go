@@ -95,7 +95,7 @@ func (e *Engine) Policy() Policy { return e.policy }
 // managed reports whether events for the pair feed a lane.
 func (e *Engine) managed(source, provider string) bool {
 	_, ok := e.providers[provider]
-	return ok && e.targets.daily(source) > 0
+	return ok && e.targets.lane(source, provider, e.providers) > 0
 }
 
 // Restore loads lanes from a snapshot. Targets are recomputed from the

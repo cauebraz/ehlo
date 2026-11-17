@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"os"
 	"regexp"
@@ -123,7 +124,7 @@ func Load(path string) (Config, error) {
 	}
 	dec := yaml.NewDecoder(bytes.NewReader(b))
 	dec.KnownFields(true)
-	if err := dec.Decode(&c); err != nil {
+	if err := dec.Decode(&c); err != nil && !errors.Is(err, io.EOF) {
 		return c, fmt.Errorf("parse config %s: %w", path, err)
 	}
 	return c, errors.Join(c.Webhooks.readSecrets(), c.Validate())

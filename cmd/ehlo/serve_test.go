@@ -136,3 +136,10 @@ func TestTailRejectsBatchAboveServerLimit(t *testing.T) {
 		t.Errorf("tail-postfix -batch 10001 = %v, want a -batch error", err)
 	}
 }
+
+func TestTailRejectsNonPositiveFlush(t *testing.T) {
+	err := tailPostfix(context.Background(), []string{"-source", "mx-1", "-flush", "0", "-file", os.DevNull})
+	if err == nil || !strings.Contains(err.Error(), "-flush") {
+		t.Errorf("tail-postfix -flush 0 = %v, want a -flush error", err)
+	}
+}

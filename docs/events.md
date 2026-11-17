@@ -35,7 +35,7 @@ Every `POST` endpoint, webhooks included, answers 403 to a cross-origin browser 
 | Type | Fields | Meaning |
 |------|--------|---------|
 | `attempt` | `attempt`: `first` (default) or `retry`. `signed`: DKIM signed. `engaged`: recipient opened or clicked recently | One delivery attempt. Only first attempts count against the warmup limit |
-| `reply` | `code`: 200-299, 400-499 or 500-599; 3xx codes are intermediate replies and are rejected. `enhanced`: such as `4.7.28`. `stage`: `connect`, `ehlo`, `tls`, `mail`, `rcpt` or `data`. `tag`: the provider's token, such as `TSS04` (2-24 of `A-Z 0-9 # : _ ( ) -`); taken from `text` when absent. `text`: up to 512 bytes. `delay`: seconds since the message was queued | The provider's answer. At stage `connect`, `ehlo` or `tls` the session ended before a transaction and `code` is optional |
+| `reply` | `code`: 200-299, 400-499 or 500-599; 3xx codes are intermediate replies and are rejected. `enhanced`: such as `4.7.28`. `stage`: `connect`, `ehlo`, `tls`, `mail`, `rcpt` or `data`; any other value is invalid. `tag`: the provider's token, such as `TSS04` (2-24 of `A-Z 0-9 # : _ ( ) -`); taken from `text` when absent. `text`: up to 512 bytes. `delay`: seconds since the message was queued | The provider's answer. At stage `connect`, `ehlo` or `tls` the session ended before a transaction and `code` is optional |
 | `bounce` | `bounce`: `hard`, `soft` or `policy` | A bounce. `soft` is a temporary failure that expired, `policy` a refusal of the sender |
 | `complaint` | | A spam complaint |
 | `open` | | An open |

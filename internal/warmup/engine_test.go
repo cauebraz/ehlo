@@ -422,6 +422,16 @@ func TestRetriesDoNotCountAgainstTheLimit(t *testing.T) {
 	}
 }
 
+func TestProviderWithZeroTargetIsUnmanaged(t *testing.T) {
+	e, _ := newEngine(t, Targets{Default: 1000, Mix: map[string]float64{"gmail": 0.6, "outlook": 0.4}})
+	if d := e.Decide("mx-1", "other"); d.Managed {
+		t.Errorf("provider outside a mix that sums to 1 = %+v, want unmanaged", d)
+	}
+	if d := e.Decide("mx-1", "gmail"); !d.Managed || d.Target != 600 {
+		t.Errorf("gmail lane = %+v, want managed with target 600", d)
+	}
+}
+
 func TestPolicyValidation(t *testing.T) {
 	bad := map[string]func(*Policy){
 		"decision_hour":         func(p *Policy) { p.DecisionHour = 24 },
@@ -432,6 +442,8 @@ func TestPolicyValidation(t *testing.T) {
 		"day_length":            func(p *Policy) { p.DayLength = time.Second },
 		"backoff.ratio":         func(p *Policy) { p.Backoff.Ratio = 2 },
 		"shaping.default":       func(p *Policy) { delete(p.Shaping, DefaultKey) },
+		"hold_complaint_ratio":  func(p *Policy) { p.HoldComplaintRatio, p.PauseComplaintRatio = 2, 3 },
+		"hold_bounce_ratio":     func(p *Policy) { p.HoldBounceRatio = 5 },
 	}
 	for field, mod := range bad {
 		_, err := New(DefaultPolicy().With(mod), Targets{}, providers)
