@@ -54,7 +54,7 @@ Every `POST` endpoint, webhooks included, answers 403 to a cross-origin browser 
 - A greeting refusal (`refused to talk to me: 554 ...`) keeps the provider's code and counts as a connection failure.
 - RFC 3164 and RFC 5424 lines are read. Lines over 1 MiB are skipped and logged.
 - RFC 3164 timestamps carry no zone. `-tz` sets it; the default is the tailer's local zone.
-- A batch the server refuses is logged and dropped, not resent.
+- A batch the server refuses with 400, 415 or 422 is logged and dropped, not resent. A batch that gets 413 is split in half until it fits, and an event too large on its own is dropped. Any other answer, including 401, 403 and 404 from a proxy or a wrong `-target`, keeps the batch for the next flush.
 - While the server is unreachable the tailer keeps at most the newest 20,000 events. Past that it drops the oldest down to 18,000 and logs the dropped count and running total at most once per flush.
 
 ## SES and SendGrid

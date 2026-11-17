@@ -159,6 +159,6 @@ Top level:
 | Command | Flags |
 |---------|-------|
 | `ehlo serve` | `-config`, and `-listen`, `-state`, `-day-length` to override the file |
-| `ehlo tail-postfix` | `-source` (required), `-target` (`http://127.0.0.1:8080`), `-file` (`-` for stdin), `-batch` (200), `-flush` (2s), `-tz` (`Local`), `-retry-after` (1m), `-skip-relay` |
+| `ehlo tail-postfix` | `-source` (required), `-target` (`http://127.0.0.1:8080`), `-file` (`-` for stdin), `-batch` (200, at most 10,000), `-flush` (2s), `-tz` (`Local`), `-retry-after` (1m), `-skip-relay` |
 | `ehlo probe <url>` | Exits 0 on HTTP 200. `-timeout` (3s) |
 | `ehlo version` | |

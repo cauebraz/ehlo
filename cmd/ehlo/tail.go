@@ -87,6 +87,10 @@ func (b *batcher) flush(ctx context.Context) error {
 	for len(b.pending) > 0 {
 		n := min(len(b.pending), b.batch)
 		err := b.post.Post(ctx, b.pending[:n])
+		for errors.Is(err, client.ErrTooLarge) && n > 1 {
+			n /= 2
+			err = b.post.Post(ctx, b.pending[:n])
+		}
 		partial, isPartial := errors.AsType[*client.PartialError](err)
 		switch {
 		case isPartial:
@@ -114,7 +118,7 @@ func tailPostfix(ctx context.Context, args []string) error {
 	source := fs.String("source", "", "sending identity for this host (required)")
 	target := fs.String("target", "http://127.0.0.1:8080", "ehlo server base URL")
 	file := fs.String("file", "-", "log file to read to its end, - for stdin; follow a live log with tail -F | ehlo tail-postfix")
-	batch := fs.Int("batch", 200, "events per request")
+	batch := fs.Int("batch", 200, "events per request, at most 10000; a batch the server finds too large is split")
 	flush := fs.Duration("flush", 2*time.Second, "send a partial batch after this long")
 	tz := fs.String("tz", "Local", "time zone of syslog timestamps, an IANA name or Local")
 	retryAfter := fs.Duration("retry-after", time.Minute, "a delivery whose message waited longer than this before its last active queue entry (the first field of delays=) is a retry")
@@ -125,8 +129,8 @@ func tailPostfix(ctx context.Context, args []string) error {
 	if *source == "" {
 		return errors.New("-source is required")
 	}
-	if *batch < 1 {
-		return errors.New("-batch must be at least 1")
+	if *batch < 1 || *batch > event.MaxBatch {
+		return fmt.Errorf("-batch must be between 1 and %d", event.MaxBatch)
 	}
 	in, closeIn, err := openInput(*file)
 	if err != nil {

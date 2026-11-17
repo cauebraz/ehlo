@@ -24,9 +24,15 @@ const (
 	maxResultBody = 64 << 10
 )
 
-// ErrRejected wraps a 4xx answer other than 408 and 429: the server read
-// the batch and refused it, so sending it again gives the same answer.
+// ErrRejected wraps a 400, 413, 415 or 422 answer: the server read the
+// batch and refused it, so sending it again gives the same answer. Other
+// 4xx answers, such as 401, 403 or 404 from a wrong token, proxy or URL,
+// are not rejections, and the batch can be sent again once that is fixed.
 var ErrRejected = errors.New("rejected by the server")
+
+// ErrTooLarge wraps a 413 answer. It also matches ErrRejected. A smaller
+// batch may pass.
+var ErrTooLarge = fmt.Errorf("%w: request too large", ErrRejected)
 
 // PartialError reports a batch the server accepted only in part. The
 // accepted events are recorded; retrying would count them twice.
@@ -100,7 +106,10 @@ func (c *Client) Post(ctx context.Context, events []event.Event) error {
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode/100 != 2 {
 		err := statusError(resp)
-		if resp.StatusCode/100 == 4 && resp.StatusCode != http.StatusRequestTimeout && resp.StatusCode != http.StatusTooManyRequests {
+		switch resp.StatusCode {
+		case http.StatusRequestEntityTooLarge:
+			err = fmt.Errorf("%w: %w", ErrTooLarge, err)
+		case http.StatusBadRequest, http.StatusUnsupportedMediaType, http.StatusUnprocessableEntity:
 			err = fmt.Errorf("%w: %w", ErrRejected, err)
 		}
 		return fmt.Errorf("post %d events: %w", len(events), err)

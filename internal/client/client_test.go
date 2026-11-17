@@ -201,3 +201,37 @@ func TestPostReportsPartialWithLongErrors(t *testing.T) {
 		t.Errorf("partial = %d accepted, %d invalid, want 1 and 10", partial.Accepted, partial.Invalid)
 	}
 }
+
+func TestPostStatusDecidesWhetherToRetry(t *testing.T) {
+	for _, tc := range []struct {
+		code               int
+		rejected, tooLarge bool
+	}{
+		{http.StatusBadRequest, true, false},
+		{http.StatusRequestEntityTooLarge, true, true},
+		{http.StatusUnsupportedMediaType, true, false},
+		{http.StatusUnprocessableEntity, true, false},
+		{http.StatusUnauthorized, false, false},
+		{http.StatusForbidden, false, false},
+		{http.StatusNotFound, false, false},
+		{http.StatusRequestTimeout, false, false},
+		{http.StatusTooManyRequests, false, false},
+		{http.StatusBadGateway, false, false},
+	} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(tc.code)
+		}))
+		err := client.New(srv.URL, time.Second).Post(context.Background(), events(1))
+		srv.Close()
+		if err == nil {
+			t.Errorf("%d: no error", tc.code)
+			continue
+		}
+		if got := errors.Is(err, client.ErrRejected); got != tc.rejected {
+			t.Errorf("%d: rejected = %v, want %v (%v)", tc.code, got, tc.rejected, err)
+		}
+		if got := errors.Is(err, client.ErrTooLarge); got != tc.tooLarge {
+			t.Errorf("%d: too large = %v, want %v (%v)", tc.code, got, tc.tooLarge, err)
+		}
+	}
+}

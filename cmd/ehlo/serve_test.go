@@ -85,3 +85,54 @@ func TestServeRejectsBadSendGridKey(t *testing.T) {
 		t.Errorf("serve = %v, want a sendgrid_public_key error", err)
 	}
 }
+
+type sizeLimitPoster struct {
+	limit  int
+	sizes  []int
+	events []event.Event
+}
+
+func (s *sizeLimitPoster) Post(_ context.Context, events []event.Event) error {
+	s.sizes = append(s.sizes, len(events))
+	if len(events) > s.limit {
+		return fmt.Errorf("post: %w", client.ErrTooLarge)
+	}
+	s.events = append(s.events, events...)
+	return nil
+}
+
+func TestFlushSplitsATooLargeBatch(t *testing.T) {
+	sp := &sizeLimitPoster{limit: 3}
+	b := &batcher{post: sp, batch: 10, max: maxPending}
+	b.add(attempts(10))
+	if err := b.flush(context.Background()); err != nil {
+		t.Fatalf("flush = %v, want nil", err)
+	}
+	if len(sp.events) != 10 || len(b.pending) != 0 {
+		t.Errorf("delivered %d events, pending %d (posts %v), want all 10 delivered", len(sp.events), len(b.pending), sp.sizes)
+	}
+	for i, e := range sp.events {
+		if e.Count != i+1 {
+			t.Fatalf("event %d has count %d, want the original order", i, e.Count)
+		}
+	}
+}
+
+func TestFlushDropsOneEventTooLargeAlone(t *testing.T) {
+	sp := &sizeLimitPoster{limit: 0}
+	b := &batcher{post: sp, batch: 4, max: maxPending}
+	b.add(attempts(2))
+	if err := b.flush(context.Background()); err != nil {
+		t.Fatalf("flush = %v, want nil", err)
+	}
+	if len(b.pending) != 0 || len(sp.events) != 0 {
+		t.Errorf("pending %d, delivered %d, want both events dropped", len(b.pending), len(sp.events))
+	}
+}
+
+func TestTailRejectsBatchAboveServerLimit(t *testing.T) {
+	err := tailPostfix(context.Background(), []string{"-source", "mx-1", "-batch", "10001", "-file", os.DevNull})
+	if err == nil || !strings.Contains(err.Error(), "-batch") {
+		t.Errorf("tail-postfix -batch 10001 = %v, want a -batch error", err)
+	}
+}
