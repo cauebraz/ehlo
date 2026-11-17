@@ -47,7 +47,7 @@ Every `POST` endpoint, webhooks included, answers 403 to a cross-origin browser 
 
 `ehlo tail-postfix` reads Postfix log lines and posts attempts, replies, bounces and TLS sessions.
 
-- A delivery is a retry when the same queue ID and recipient appeared before, or when the message waited in the queue at least `-retry-after` (default 1m).
+- A delivery is a retry when the same queue ID and recipient appeared before, or when the first field of `delays=` (the time from arrival to the last active queue entry, which includes the deferred queue) is at least `-retry-after` (default 1m). Time spent waiting for a delivery slot in the active queue (the second field) does not count, so a first attempt held back by a concurrency limit stays `first`.
 - `journalctl -o short-iso` lines are read, with the offset written as `+0000` (systemd 252, Debian 12) or `+00:00`.
 - Lines from `lmtp`, `local`, `virtual`, `pipe`, `discard`, `error` and `retry` are skipped. None of them talks to a provider.
 - Lines whose relay is listed in `-skip-relay` are skipped, so a smarthost's 250 is not counted as the provider's.

@@ -185,9 +185,13 @@ func TestRetryIsPerRecipient(t *testing.T) {
 	if again[0].Attempt != event.Retry {
 		t.Errorf("same recipient again = %s, want retry", again[0].Attempt)
 	}
-	active := p.Parse(`Mar 10 08:15:02 mx-1 postfix/smtp[2231]: 4F3A1B2C3F: to=<user3@gmail.com>, relay=gmail-smtp-in.l.google.com[203.0.113.26]:25, delay=120, delays=0.01/119/0.21/0.3, dsn=2.0.0, status=sent (250 2.0.0 OK)`)
-	if active[0].Attempt != event.Retry {
-		t.Errorf("two minutes in the active queue = %s, want retry", active[0].Attempt)
+	active := p.Parse(`Mar 10 08:15:02 mx-1 postfix/smtp[2231]: 4F3A1B2C3F: to=<user3@gmail.com>, relay=gmail-smtp-in.l.google.com[203.0.113.26]:25, delay=100, delays=0/96/0/4, dsn=2.0.0, status=sent (250 2.0.0 OK)`)
+	if active[0].Attempt != event.First {
+		t.Errorf("96s waiting for a delivery slot in the active queue = %s, want first", active[0].Attempt)
+	}
+	deferred := p.Parse(`Mar 10 08:15:02 mx-1 postfix/smtp[2231]: 4F3A1B2C40: to=<user4@gmail.com>, relay=gmail-smtp-in.l.google.com[203.0.113.26]:25, delay=301, delays=300/0.5/0.21/0.3, dsn=2.0.0, status=sent (250 2.0.0 OK)`)
+	if deferred[0].Attempt != event.Retry {
+		t.Errorf("five minutes before the last active queue entry, first line unseen = %s, want retry", deferred[0].Attempt)
 	}
 }
 

@@ -51,7 +51,7 @@ The transform reads columns by position: `type,timeLogged,timeQueued,rcpt,dsnSta
 
 - `source` is `vmta`, else `dlvSourceIp`, else `powermta`.
 - `code` comes from `dsnDiag` (`smtp;421 ...`), `enhanced` from `dsnStatus` (`4.7.0 (...)`), `text` from `dsnDiag` cut to 128 characters.
-- `attempt` is `retry` when the message waited 60 seconds or more between `timeQueued` and `timeLogged`, the same rule as `ehlo tail-postfix -retry-after`.
+- `attempt` is `retry` when the message waited 60 seconds or more between `timeQueued` and `timeLogged`. Unlike `ehlo tail-postfix -retry-after`, which reads only the time before the last active queue entry, this also counts the time a first attempt waited in a throttled PowerMTA queue, so such attempts become `retry`.
 - `bounce` is `policy` for `policy-related`, `spam-related`, `content-related`, `invalid-sender` or a `5.7.x` status, `soft` for `message-expired` or a `4.x.x` status, else `hard`.
 - Feedback records name no VirtualMTA, so complaints land on source `powermta`, not on the lane that sent the message.
 

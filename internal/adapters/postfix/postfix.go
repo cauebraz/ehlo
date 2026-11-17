@@ -27,7 +27,7 @@ var (
 	queueID    = `(?P<id>[0-9A-F]{6,}|[0-9A-Za-z]{10,}): `
 	deliveryRe = regexp.MustCompile(daemon + queueID +
 		`to=<(?P<rcpt>[^>]*@(?P<domain>[^>]+))>,(?: orig_to=<[^>]*>,)? relay=(?P<relay>[^,]+),(?: conn_use=\d+,)? ` +
-		`delay=(?P<delay>` + number + `), delays=(?P<before>` + number + `)/(?P<active>` + number + `)/` + number + `/` + number + `,` +
+		`delay=(?P<delay>` + number + `), delays=(?P<before>` + number + `)/` + number + `/` + number + `/` + number + `,` +
 		`(?: tls=[^,]+,)? dsn=(?P<dsn>[\d.]+), status=(?P<status>\w+) \((?P<text>.*)\)$`)
 	enhancedRe = regexp.MustCompile(`\b([245]\.\d{1,3}\.\d{1,3})\b`)
 	expiredRe  = regexp.MustCompile(daemonFor("qmgr") + queueID + `from=<[^>]*>, status=expired, returned to sender`)
@@ -49,7 +49,6 @@ var (
 	relayGroup   = deliveryRe.SubexpIndex("relay")
 	delayGroup   = deliveryRe.SubexpIndex("delay")
 	beforeGroup  = deliveryRe.SubexpIndex("before")
-	activeGroup  = deliveryRe.SubexpIndex("active")
 	dsnGroup     = deliveryRe.SubexpIndex("dsn")
 	statusGroup  = deliveryRe.SubexpIndex("status")
 	textGroup    = deliveryRe.SubexpIndex("text")
@@ -75,7 +74,8 @@ type Parser struct {
 	// Location is the zone of syslog timestamps, which carry none. Nil
 	// means the host's local zone.
 	Location *time.Location
-	// RetryAfter is the queue age from which a delivery line is a retry.
+	// RetryAfter is the time from arrival to the last active queue entry,
+	// the first field of delays=, from which a delivery line is a retry.
 	// Zero means one minute. Lines for a queue id already seen are retries
 	// whatever their age.
 	RetryAfter time.Duration
@@ -96,7 +96,8 @@ func WithClock(now func() time.Time) Option { return func(p *Parser) { p.Now = n
 // WithLocation sets the zone of syslog timestamps.
 func WithLocation(loc *time.Location) Option { return func(p *Parser) { p.Location = loc } }
 
-// WithRetryAfter sets the queue age from which a delivery line is a retry.
+// WithRetryAfter sets the wait before the last active queue entry from which
+// a delivery line is a retry.
 func WithRetryAfter(d time.Duration) Option { return func(p *Parser) { p.RetryAfter = d } }
 
 // WithSkipRelays sets the relay hosts whose delivery lines are ignored.
@@ -180,13 +181,12 @@ func (p *Parser) delivery(m []string, base event.Event) []event.Event {
 	}
 	delay, _ := strconv.ParseFloat(m[delayGroup], 64)
 	before, _ := strconv.ParseFloat(m[beforeGroup], 64)
-	active, _ := strconv.ParseFloat(m[activeGroup], 64)
 	dsn, text := m[dsnGroup], m[textGroup]
 
 	base.Domain = strings.ToLower(m[domainGroup])
 	attempt := base
 	attempt.Type, attempt.Attempt = event.Attempt, event.First
-	if p.retry(m[idGroup]+"|"+strings.ToLower(m[rcptGroup]), before+active) {
+	if p.retry(m[idGroup]+"|"+strings.ToLower(m[rcptGroup]), before) {
 		attempt.Attempt = event.Retry
 	}
 	reply := base
@@ -300,8 +300,8 @@ func (p *Parser) when(line string) time.Time {
 }
 
 // retry reports whether a delivery line is a retry: the queue id and
-// recipient were seen before, or the message waited in the queue longer
-// than RetryAfter.
+// recipient were seen before, or the message waited longer than RetryAfter
+// before its last active queue entry.
 func (p *Parser) retry(id string, queued float64) bool {
 	_, seen := p.seen[id]
 	if !seen {
