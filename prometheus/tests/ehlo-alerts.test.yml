@@ -3,6 +3,7 @@ rule_files:
   - ../rules/ehlo-alerts.yml
 
 evaluation_interval: 15s
+group_eval_order: [ehlo-recording, ehlo-alerts]
 
 tests:
   - name: telemetry absent fires when the scrape fails

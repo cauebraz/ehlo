@@ -5,6 +5,7 @@ rule_files:
   - staging/rules/ehlo-alerts.yml
 
 evaluation_interval: 15s
+group_eval_order: [ehlo-recording, ehlo-alerts, staging-recording, staging-alerts]
 
 tests:
   - name: two renders in one Prometheus record apart and each reads only its own series

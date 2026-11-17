@@ -3,6 +3,7 @@ rule_files:
   - rules/ehlo-alerts.yml
 
 evaluation_interval: 15s
+group_eval_order: [ehlo-recording, ehlo-alerts]
 
 tests:
   - name: a failing target and a vanished cluster each alert once, with the cluster
