@@ -45,7 +45,7 @@ step "promtool test rules rendered with -selector job=\"mail-ehlo\" -group-by cl
 go run ./cmd/ehlo-monitoring render -selector 'job="mail-ehlo"' -group-by cluster -format all -out "$variant" >/dev/null
 go run ./cmd/ehlo-monitoring render -selector 'job="ehlo-staging"' -group-by cluster -uid-prefix staging- -format prometheus -out "$variant/staging" >/dev/null
 cp prometheus/tests/ehlo-variant.test.yml prometheus/tests/ehlo-coexist.test.yml "$variant/"
-docker run --rm -v "$variant:/work:ro" -w /work --entrypoint promtool "$promtool_image" \
+docker run --rm --user "$(id -u):$(id -g)" -v "$variant:/work:ro" -w /work --entrypoint promtool "$promtool_image" \
     test rules ehlo-variant.test.yml ehlo-coexist.test.yml
 
 step "promtool parses every dashboard query, default and variant"
@@ -61,7 +61,7 @@ dashboard_queries() {
 }
 dashboard_queries grafana/dashboards > "$variant/queries-default.yml"
 dashboard_queries "$variant/dashboards" > "$variant/queries-variant.yml"
-docker run --rm -v "$variant:/work:ro" -w /work --entrypoint promtool "$promtool_image" \
+docker run --rm --user "$(id -u):$(id -g)" -v "$variant:/work:ro" -w /work --entrypoint promtool "$promtool_image" \
     check rules --lint=none queries-default.yml queries-variant.yml
 
 step "compose config"
