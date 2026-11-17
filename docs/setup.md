@@ -14,6 +14,18 @@
 
 The justfile lists all eight scenarios. `just down` keeps the warmup state in the `ehlo-state` volume. If the logs show `permission denied` on the snapshot, the volume predates the current image; run `just reset` once.
 
+## Requirements
+
+| Component | Version |
+|-----------|---------|
+| Go, to build from source | 1.27 or later |
+| Prometheus, for the rules and alerts | 3.x; CI tests them with 3.16 |
+| Grafana, to import the dashboards | 13 or later. The dashboards use the Grafana dashboard schema v2, which older versions cannot import. Releases also attach classic copies, tested on 12.4 |
+| Kubernetes, for the Helm chart | 1.30 or later; CI tests the chart with Helm 4.3.2 |
+| Grafana Operator, for `GrafanaManifest` objects | v5.25 or later |
+
+Run one ehlo process per warmup state: each process counts its own sends, so two replicas would split the counts ([why](monitoring.md#one-replica)).
+
 ## Install
 
 From source, with Go 1.27 or later. Replace `<tag>` with a tag from the [releases page](https://github.com/cauebraz/ehlo/releases):
