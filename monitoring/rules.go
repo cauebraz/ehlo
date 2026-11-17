@@ -132,7 +132,12 @@ sum by (source, provider) (increase(ehlo_reply_categories_total{route="self_host
 			Summary:     "{{ $labels.provider }} slows down {{ $labels.source }} ({{ $value | humanizePercentage }} of attempts)",
 			Description: "{{ $labels.provider }} asks {{ $labels.source }} to send less. The warmup engine already pauses the lane for 10 minutes. If this repeats, lower the target of {{ $labels.source }} for {{ $labels.provider }}."},
 		{Alert: "EhloAuthenticationRejected", For: "2m", Severity: critical, Dashboard: "reputation",
-			Expr:        `sum by (source, provider) (increase(ehlo_reply_categories_total{route="self_hosted", category="auth_failure"}[10m])) > 0`,
+			Expr: `sum by (source, provider) (
+    (ehlo_reply_categories_total{route="self_hosted", category="auth_failure"}
+      unless ehlo_reply_categories_total{route="self_hosted", category="auth_failure"} offset 10m)
+  or
+    increase(ehlo_reply_categories_total{route="self_hosted", category="auth_failure"}[10m])
+) > 0`,
 			Summary:     "{{ $labels.provider }} rejects mail from {{ $labels.source }} for failed SPF, DKIM, DMARC, TLS or reverse DNS",
 			Description: "{{ $value | humanize }} replies in 10 minutes. First check the DNS records, the DKIM signer and the PTR of the sending IP of {{ $labels.source }}. Do not suppress the recipients."},
 		{Alert: "EhloReputationBlock", For: "2m", KeepFiringFor: "10m", Severity: critical, Dashboard: "reputation",
@@ -192,7 +197,11 @@ sum by (source, provider) (increase(ehlo_complaints_total{route="self_hosted"}[2
 			Summary:     "{{ $labels.provider }} blocked {{ $labels.source }}, lane stopped until the next day",
 			Description: "Reputation block replies reached 1% of attempts. First request delisting, as in EhloReputationBlock, and send mail to {{ $labels.provider }} through another server."},
 		{Alert: "EhloDMARCUnauthenticatedSource", Severity: warning, Dashboard: "reputation",
-			Expr:        `sum by (source) (increase(ehlo_dmarc_messages_total{spf="fail", dkim="fail"}[1d])) > 0`,
+			Expr: `sum by (source) (
+    (ehlo_dmarc_messages_total{spf="fail", dkim="fail"} unless ehlo_dmarc_messages_total{spf="fail", dkim="fail"} offset 1d)
+  or
+    increase(ehlo_dmarc_messages_total{spf="fail", dkim="fail"}[1d])
+) > 0`,
 			Summary:     "DMARC reports show mail from {{ $labels.source }} that fails both SPF and DKIM",
 			Description: "{{ $value | humanize }} messages in the last day. Either a service sends as your domain without SPF or DKIM set up, or someone spoofs the domain. First identify the sending IPs in the report."},
 	}}

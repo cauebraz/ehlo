@@ -99,7 +99,13 @@ groups:
           runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloproviderratelimiting
           dashboard_uid: ehlo-delivery
       - alert: EhloAuthenticationRejected
-        expr: sum by (source, provider) (increase(ehlo_reply_categories_total{route="self_hosted", category="auth_failure"}[10m])) > 0
+        expr: |-
+          sum by (source, provider) (
+              (ehlo_reply_categories_total{route="self_hosted", category="auth_failure"}
+                unless ehlo_reply_categories_total{route="self_hosted", category="auth_failure"} offset 10m)
+            or
+              increase(ehlo_reply_categories_total{route="self_hosted", category="auth_failure"}[10m])
+          ) > 0
         for: 2m
         labels:
           component: ehlo
@@ -236,7 +242,12 @@ groups:
           runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlowarmuplaneblocked
           dashboard_uid: ehlo-warmup
       - alert: EhloDMARCUnauthenticatedSource
-        expr: sum by (source) (increase(ehlo_dmarc_messages_total{spf="fail", dkim="fail"}[1d])) > 0
+        expr: |-
+          sum by (source) (
+              (ehlo_dmarc_messages_total{spf="fail", dkim="fail"} unless ehlo_dmarc_messages_total{spf="fail", dkim="fail"} offset 1d)
+            or
+              increase(ehlo_dmarc_messages_total{spf="fail", dkim="fail"}[1d])
+          ) > 0
         labels:
           component: ehlo
           severity: warning

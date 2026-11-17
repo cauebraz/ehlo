@@ -115,6 +115,6 @@ Critical. The warmup engine stopped a lane after reputation block replies reache
 
 ## EhloDMARCUnauthenticatedSource
 
-Warning. DMARC reports from the last day show mail from a source that failed both SPF and DKIM. Either a service sends as your domain without SPF or DKIM set up, or someone spoofs the domain.
+Warning. DMARC reports from the last day show mail from a source that failed both SPF and DKIM. Either a service sends as your domain without SPF or DKIM set up, or someone spoofs the domain. A source seen for the first time, such as a spoofing IP absent from the config, alerts on its first rows: when its series is newer than the day, the alert counts its whole value. EhloAuthenticationRejected does the same over 10 minutes for a source absent from the config.
 
 Set up the service, or confirm the domain publishes `p=reject`.
