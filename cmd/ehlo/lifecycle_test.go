@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -17,9 +18,12 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/cauebraz/ehlo/internal/adapters/postfix"
 	"github.com/cauebraz/ehlo/internal/config"
 	"github.com/cauebraz/ehlo/internal/event"
+	"github.com/cauebraz/ehlo/internal/metrics"
 	"github.com/cauebraz/ehlo/internal/warmup"
 )
 
@@ -161,6 +165,7 @@ func TestHTTPServerHeaderLimitIsExact(t *testing.T) {
 type countingStore struct {
 	mu    sync.Mutex
 	saves int
+	err   error
 }
 
 func (*countingStore) Load() (warmup.Snapshot, error) { return warmup.Snapshot{}, nil }
@@ -169,7 +174,7 @@ func (c *countingStore) Save(warmup.Snapshot) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.saves++
-	return nil
+	return c.err
 }
 
 func (c *countingStore) count() int {
@@ -187,7 +192,7 @@ func TestSnapshotLoopSavesEveryIntervalUntilCancel(t *testing.T) {
 		store := &countingStore{}
 		ctx, cancel := context.WithCancel(t.Context())
 		var wg sync.WaitGroup
-		wg.Go(func() { snapshotLoop(ctx, eng, store, 30*time.Second) })
+		wg.Go(func() { snapshotLoop(ctx, eng, store, 30*time.Second, metrics.New(prometheus.NewRegistry(), "test")) })
 		time.Sleep(95 * time.Second)
 		synctest.Wait()
 		if got := store.count(); got != 3 {
@@ -200,6 +205,61 @@ func TestSnapshotLoopSavesEveryIntervalUntilCancel(t *testing.T) {
 			t.Errorf("saves after cancel = %d, want still 3", got)
 		}
 	})
+}
+
+func TestSnapshotLoopExportsSaveResults(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		eng, err := warmup.New(warmup.DefaultPolicy(), warmup.Targets{Default: 1000}, []string{"gmail", "other"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		reg := prometheus.NewRegistry()
+		m := metrics.New(reg, "test")
+		store := &countingStore{}
+		ctx, cancel := context.WithCancel(t.Context())
+		var wg sync.WaitGroup
+		wg.Go(func() { snapshotLoop(ctx, eng, store, 30*time.Second, m) })
+		time.Sleep(35 * time.Second)
+		synctest.Wait()
+		saved := gathered(t, reg, "ehlo_warmup_snapshot_last_success_timestamp_seconds")
+		if saved != float64(time.Now().Add(-5*time.Second).Unix()) {
+			t.Errorf("last success after one save = %v, want the save time", saved)
+		}
+		store.mu.Lock()
+		store.err = errors.New("permission denied")
+		store.mu.Unlock()
+		time.Sleep(60 * time.Second)
+		synctest.Wait()
+		if got := gathered(t, reg, "ehlo_warmup_snapshot_failures_total"); got != 2 {
+			t.Errorf("failures after two failed saves = %v, want 2", got)
+		}
+		if got := gathered(t, reg, "ehlo_warmup_snapshot_last_success_timestamp_seconds"); got != saved {
+			t.Errorf("last success after failed saves = %v, want unchanged %v", got, saved)
+		}
+		cancel()
+		wg.Wait()
+	})
+}
+
+func gathered(t *testing.T, reg prometheus.Gatherer, name string) float64 {
+	t.Helper()
+	families, err := reg.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range families {
+		if f.GetName() != name {
+			continue
+		}
+		for _, m := range f.GetMetric() {
+			if c := m.GetCounter(); c != nil {
+				return c.GetValue()
+			}
+			return m.GetGauge().GetValue()
+		}
+	}
+	t.Fatalf("%s not gathered", name)
+	return 0
 }
 
 func TestPumpFlushesPartialBatchOnTick(t *testing.T) {

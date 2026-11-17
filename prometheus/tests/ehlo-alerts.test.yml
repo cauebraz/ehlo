@@ -117,6 +117,37 @@ tests:
         alertname: EhloIngestInvalidEvents
         exp_alerts: []
 
+  - name: warmup state saves stop
+    interval: 1m
+    input_series:
+      - series: 'ehlo_warmup_snapshot_last_success_timestamp_seconds{job="ehlo", instance="ehlo:8080"}'
+        values: '0+60x2 120x20'
+    alert_rule_test:
+      - eval_time: 11m
+        alertname: EhloWarmupStateNotSaved
+        exp_alerts: []
+      - eval_time: 13m
+        alertname: EhloWarmupStateNotSaved
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: warning
+            exp_annotations:
+              summary: ehlo has not saved the warmup state for 11m 0s
+              description: "A restart now loses the lanes' progress since the last save, or every lane when no save ever succeeded. First check the ehlo log for save warmup snapshot errors and that the state path is writable (on Kubernetes, the /data volume)."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlowarmupstatenotsaved
+              dashboard_uid: ehlo-pipeline
+
+  - name: warmup state saved on time does not alert
+    interval: 1m
+    input_series:
+      - series: 'ehlo_warmup_snapshot_last_success_timestamp_seconds{job="ehlo", instance="ehlo:8080"}'
+        values: '0+60x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: EhloWarmupStateNotSaved
+        exp_alerts: []
+
   - name: one lane at its limit, the provider still has room
     interval: 15s
     input_series:

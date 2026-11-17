@@ -1,6 +1,7 @@
 package metrics_test
 
 import (
+	"errors"
 	"math"
 	"slices"
 	"testing"
@@ -246,14 +247,14 @@ func TestCount(t *testing.T) {
 func TestPrimeCreatesZeroSeries(t *testing.T) {
 	reg := prometheus.NewPedanticRegistry()
 	m := metrics.New(reg, "test")
-	if before := count(t, reg); before != 1 {
-		t.Fatalf("series before prime = %d, want only build info", before)
+	if before := count(t, reg); before != 3 {
+		t.Fatalf("series before prime = %d, want build info and the two snapshot series", before)
 	}
 	m.Prime(event.RouteSelfHosted, "mx-1", []string{"gmail", "yahoo"})
 	after := count(t, reg)
 	tlsSeries := len(event.TLSVersions()) * len(event.TLSTrusts())
 	perProvider := 2 + 1 + 1 + 1 + 1 + 1 + 3 + 2 + len(classify.Categories)
-	want := 1 + tlsSeries + 2 + 2*perProvider + 4 + 2*len(event.Types)
+	want := 3 + tlsSeries + 2 + 2*perProvider + 4 + 2*len(event.Types)
 	if after != want {
 		t.Errorf("series after prime = %d, want %d", after, want)
 	}
@@ -330,5 +331,24 @@ func TestWarmupCollector(t *testing.T) {
 	empty.MustRegister(metrics.NewWarmup(func() []warmup.Decision { return nil }))
 	if n := count(t, empty); n != 0 {
 		t.Errorf("empty lanes emit %d series, want 0", n)
+	}
+}
+
+func TestSnapshotSeries(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	m := metrics.New(reg, "v1.0.0", metrics.WithClock(func() time.Time { return now }))
+	if s, ok := find(t, reg, "ehlo_warmup_snapshot_last_success_timestamp_seconds", map[string]string{}); !ok || s.value != 0 {
+		t.Errorf("last success before any save = %+v (found %v), want 0", s, ok)
+	}
+	if s, ok := find(t, reg, "ehlo_warmup_snapshot_failures_total", map[string]string{}); !ok || s.value != 0 {
+		t.Errorf("failures before any save = %+v (found %v), want 0", s, ok)
+	}
+	m.Snapshot(nil)
+	m.Snapshot(errors.New("permission denied"))
+	if s, _ := find(t, reg, "ehlo_warmup_snapshot_last_success_timestamp_seconds", map[string]string{}); s.value != float64(now.Unix()) {
+		t.Errorf("last success = %v, want %d", s.value, now.Unix())
+	}
+	if s, _ := find(t, reg, "ehlo_warmup_snapshot_failures_total", map[string]string{}); s.value != 1 {
+		t.Errorf("failures = %v, want 1", s.value)
 	}
 }

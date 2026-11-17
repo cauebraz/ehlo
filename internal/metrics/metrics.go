@@ -74,6 +74,8 @@ type Metrics struct {
 	queue           *queueGauges
 	lastEvent       *prometheus.GaugeVec
 	lag             *prometheus.HistogramVec
+	snapshotAt      prometheus.Gauge
+	snapshotFails   prometheus.Counter
 	now             func() time.Time
 
 	codes codeSet
@@ -124,6 +126,10 @@ func New(reg prometheus.Registerer, version string, opts ...Option) *Metrics {
 			Help:    "Seconds between an event's own time and its receipt, by type. The log tail lag.",
 			Buckets: []float64{1, 5, 15, 60, 300, 900, 3600, 14400},
 		}, []string{"type"}),
+		snapshotAt: prometheus.NewGauge(prometheus.GaugeOpts{Name: "ehlo_warmup_snapshot_last_success_timestamp_seconds",
+			Help: "Time the warmup state was last saved to the state file, 0 before the first save."}),
+		snapshotFails: prometheus.NewCounter(prometheus.CounterOpts{Name: "ehlo_warmup_snapshot_failures_total",
+			Help: "Failed saves of the warmup state file."}),
 		now:   time.Now,
 		codes: codeSet{lanes: map[laneKey]map[string]bool{}, detailed: map[laneKey]int{}},
 	}
@@ -134,8 +140,17 @@ func New(reg prometheus.Registerer, version string, opts ...Option) *Metrics {
 	build := gauge("ehlo_build_info", "Build information.", "version")
 	build.WithLabelValues(version).Set(1)
 	reg.MustRegister(m.events, m.attempts, m.replies, m.categories, m.connectFailures, m.delivered, m.delivery,
-		m.bounces, m.complaints, m.opens, m.dkim, m.audience, m.tls, m.dmarc, m.queue, m.lastEvent, m.lag, build)
+		m.bounces, m.complaints, m.opens, m.dkim, m.audience, m.tls, m.dmarc, m.queue, m.lastEvent, m.lag, m.snapshotAt, m.snapshotFails, build)
 	return m
+}
+
+// Snapshot records the result of one save of the warmup state.
+func (m *Metrics) Snapshot(err error) {
+	if err != nil {
+		m.snapshotFails.Inc()
+		return
+	}
+	m.snapshotAt.Set(float64(m.now().Unix()))
 }
 
 func route(e *event.Event) string {

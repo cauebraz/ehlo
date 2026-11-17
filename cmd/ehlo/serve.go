@@ -48,6 +48,7 @@ func serve(ctx context.Context, args []string) error {
 		return err
 	}
 	reg, m := buildRegistry(cfg, cls, eng)
+	saveSnapshot(eng, store, m)
 	opts, err := serverOptions(cfg)
 	if err != nil {
 		return err
@@ -59,7 +60,7 @@ func serve(ctx context.Context, args []string) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	var wg sync.WaitGroup
-	wg.Go(func() { snapshotLoop(ctx, eng, store, cfg.Snapshot) })
+	wg.Go(func() { snapshotLoop(ctx, eng, store, cfg.Snapshot, m) })
 	errc := make(chan error, 1)
 	go func() { errc <- httpSrv.ListenAndServe() }()
 	slog.Info("ehlo serving", "listen", cfg.Listen, "version", buildVersion(), "lanes", lanes, "state", cfg.StatePath)
@@ -173,7 +174,7 @@ func buildRegistry(cfg config.Config, cls *provider.Classifier, eng *warmup.Engi
 
 // snapshotLoop rolls the policy day and saves the lanes every interval,
 // so a restart loses at most one interval of counters.
-func snapshotLoop(ctx context.Context, eng *warmup.Engine, store warmup.Store, every time.Duration) {
+func snapshotLoop(ctx context.Context, eng *warmup.Engine, store warmup.Store, every time.Duration, m *metrics.Metrics) {
 	t := time.NewTicker(every)
 	defer t.Stop()
 	for {
@@ -182,10 +183,18 @@ func snapshotLoop(ctx context.Context, eng *warmup.Engine, store warmup.Store, e
 			return
 		case <-t.C:
 			eng.Roll()
-			if err := store.Save(eng.Snapshot()); err != nil {
-				slog.Error("save warmup snapshot", "err", err)
-			}
+			saveSnapshot(eng, store, m)
 		}
+	}
+}
+
+// saveSnapshot saves the lanes and exports the result, so a state file
+// that cannot be written raises EhloWarmupStateNotSaved.
+func saveSnapshot(eng *warmup.Engine, store warmup.Store, m *metrics.Metrics) {
+	err := store.Save(eng.Snapshot())
+	m.Snapshot(err)
+	if err != nil {
+		slog.Error("save warmup snapshot", "err", err)
 	}
 }
 

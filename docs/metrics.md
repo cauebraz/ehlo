@@ -32,6 +32,8 @@ Labels `source` and `provider`, read from the lanes at scrape time. See [limits.
 
 `ehlo_warmup_daily_limit_messages`, `ehlo_warmup_hourly_limit_messages`, `ehlo_warmup_sent_today_messages`, `ehlo_warmup_delivered_today_messages`, `ehlo_warmup_bounces_today`, `ehlo_warmup_complaints_today`, `ehlo_warmup_target_messages`, `ehlo_warmup_share_ratio` (the lane's limit over all limits toward the provider), `ehlo_warmup_day`, `ehlo_warmup_backoffs`, and `ehlo_warmup_state` with a `state` label set to 1 for the current state.
 
+Two series without labels report the state file: `ehlo_warmup_snapshot_last_success_timestamp_seconds`, the time of the last successful save (0 before the first one), and `ehlo_warmup_snapshot_failures_total`. The server saves at start, every `snapshot_interval` (30s) and on shutdown.
+
 ## Recording rules
 
 `prometheus/rules/ehlo-recording.yml` defines `ehlo:lane_quota_used:ratio`, `ehlo:feed_age_seconds` and these 10-minute ratios: `delivery`, `complaint`, `bounce`, `hard_bounce`, `open`, `smtp_deferral`, `connect_failure`, `category`, `dkim_unsigned`, each named `ehlo:<name>:ratio_rate10m`. `ehlo:lane_quota_used:ratio` has no sample for a lane whose daily limit is 0, such as a paused lane. Every recording rule aggregates by ehlo's own labels, such as `source` and `provider`, plus the `group_by` labels and the labels of the selector's equality matchers of the render ([monitoring.md](monitoring.md)), so its series carry no `instance`, and no `job` unless the selector sets one. Gauges are taken once per source or lane (`max by`), so two ehlo processes reporting the same lane do not double it.

@@ -5,7 +5,7 @@ One section per alert in `prometheus/rules/ehlo-alerts.yml`, with what fired it 
 | Severity | Alerts |
 |----------|--------|
 | critical | [EhloTelemetryAbsent](#ehlotelemetryabsent), [EhloProviderCapacityExhausted](#ehloprovidercapacityexhausted), [EhloDKIMUnsigned](#ehlodkimunsigned), [EhloAuthenticationRejected](#ehloauthenticationrejected), [EhloReputationBlock](#ehloreputationblock), [EhloComplaintRateHigh](#ehlocomplaintratehigh), [EhloWarmupLaneBlocked](#ehlowarmuplaneblocked) |
-| warning | [EhloIngestInvalidEvents](#ehloingestinvalidevents), [EhloProviderRateLimiting](#ehloproviderratelimiting), [EhloHardBounceRateHigh](#ehlohardbounceratehigh), [EhloFeedbackFeedStale](#ehlofeedbackfeedstale), [EhloConnectionFailures](#ehloconnectionfailures), [EhloDeferredQueueGrowing](#ehlodeferredqueuegrowing), [EhloQueueFeedStale](#ehloqueuefeedstale), [EhloDMARCUnauthenticatedSource](#ehlodmarcunauthenticatedsource) |
+| warning | [EhloIngestInvalidEvents](#ehloingestinvalidevents), [EhloWarmupStateNotSaved](#ehlowarmupstatenotsaved), [EhloProviderRateLimiting](#ehloproviderratelimiting), [EhloHardBounceRateHigh](#ehlohardbounceratehigh), [EhloFeedbackFeedStale](#ehlofeedbackfeedstale), [EhloConnectionFailures](#ehloconnectionfailures), [EhloDeferredQueueGrowing](#ehlodeferredqueuegrowing), [EhloQueueFeedStale](#ehloqueuefeedstale), [EhloDMARCUnauthenticatedSource](#ehlodmarcunauthenticatedsource) |
 | info | [EhloLaneAtDailyLimit](#ehlolaneatdailylimit), [EhloWarmupLanePaused](#ehlowarmuplanepaused) |
 
 What every alert carries:
@@ -19,13 +19,19 @@ Thresholds on SMTP replies apply to the `self_hosted` route. EhloIngestInvalidEv
 
 Critical. A target that exported `ehlo_build_info` in the last day has failed its scrape for 1 minute, or no target exports ehlo series at all. No other alert can fire until this clears. The alert does not depend on the job name. With `group_by` labels such as `cluster`, the second case becomes a group that exported ehlo series in the last day and exports none now, so the alert keeps the label it is routed on; it resolves a day after the group's last series, for example after a cluster is removed.
 
-Check that the ehlo process runs and answers on `/metrics` (in the demo, `just ps` and `just logs ehlo`), then the scrape target in Prometheus. The warmup state is saved every 30 seconds and on shutdown.
+Check that the ehlo process runs and answers on `/metrics` (in the demo, `just ps` and `just logs ehlo`), then the scrape target in Prometheus. The warmup state is saved at start, every 30 seconds and on shutdown.
 
 ## EhloIngestInvalidEvents
 
 Warning. More than 1% of one event type failed validation over 10 minutes. The `type` label names it. The panels do not count these events.
 
 The `POST /v1/events` response lists the first ten errors with each event's index. Fix the adapter against [events.md](events.md).
+
+## EhloWarmupStateNotSaved
+
+Warning. The last successful save of the warmup state is more than 5 minutes old, for 5 minutes. The server keeps running and `/healthz` stays `ok`, but a restart loads the last saved state: lanes lose their progress since that save, and start again at `start_limit` when no save ever succeeded.
+
+Search the ehlo log for `save warmup snapshot` errors. Then check that `state_path` is writable by the ehlo user; on Kubernetes, check the volume mounted at `/data`. The alert assumes `snapshot_interval` below 5 minutes.
 
 ## EhloLaneAtDailyLimit
 

@@ -34,6 +34,17 @@ groups:
           description: ehlo drops these events, so the dashboards undercount. First read the errors in the POST /v1/events response of the adapter that sends {{ $labels.type }} events.
           runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloingestinvalidevents
           dashboard_uid: ehlo-pipeline
+      - alert: EhloWarmupStateNotSaved
+        expr: time() - max by () (ehlo_warmup_snapshot_last_success_timestamp_seconds) > 300
+        for: 5m
+        labels:
+          component: ehlo
+          severity: warning
+        annotations:
+          summary: ehlo has not saved the warmup state for {{ $value | humanizeDuration }}
+          description: A restart now loses the lanes' progress since the last save, or every lane when no save ever succeeded. First check the ehlo log for save warmup snapshot errors and that the state path is writable (on Kubernetes, the /data volume).
+          runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlowarmupstatenotsaved
+          dashboard_uid: ehlo-pipeline
       - alert: EhloLaneAtDailyLimit
         expr: ehlo:lane_quota_used:ratio >= 1
         labels:

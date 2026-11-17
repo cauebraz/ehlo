@@ -22,7 +22,7 @@ Mailbox providers judge each sending IP by its history. An IP that sends 100,000
 
 ```
 Postfix, KumoMTA, PowerMTA,      events      +------+   /metrics    Prometheus, Grafana:
-SES, SendGrid, your code    ---------------> | ehlo | ------------> 9 dashboards, 17 alerts
+SES, SendGrid, your code    ---------------> | ehlo | ------------> 9 dashboards, 18 alerts
                                              |      |
 your sending code           <--------------- |      |
 (picks a server per batch)   GET /v1/limits  +------+
