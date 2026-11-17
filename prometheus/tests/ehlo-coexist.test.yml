@@ -1,0 +1,67 @@
+rule_files:
+  - rules/ehlo-recording.yml
+  - rules/ehlo-alerts.yml
+  - staging/rules/ehlo-recording.yml
+  - staging/rules/ehlo-alerts.yml
+
+evaluation_interval: 15s
+
+tests:
+  - name: two renders in one Prometheus record apart and each reads only its own series
+    interval: 15s
+    input_series:
+      - series: 'ehlo_delivered_total{cluster="eu", job="mail-ehlo", instance="a", route="self_hosted", source="mx-1", provider="gmail"}'
+        values: '0+50x80'
+      - series: 'ehlo_smtp_attempts_total{cluster="eu", job="mail-ehlo", instance="a", route="self_hosted", source="mx-1", provider="gmail", attempt="first"}'
+        values: '0+100x80'
+      - series: 'ehlo_delivered_total{cluster="eu", job="ehlo-staging", instance="s", route="self_hosted", source="mx-1", provider="gmail"}'
+        values: '0+25x80'
+      - series: 'ehlo_smtp_attempts_total{cluster="eu", job="ehlo-staging", instance="s", route="self_hosted", source="mx-1", provider="gmail", attempt="first"}'
+        values: '0+100x80'
+      - series: 'ehlo_warmup_sent_today_messages{cluster="eu", job="mail-ehlo", instance="a", route="self_hosted", source="mx-1", provider="gmail"}'
+        values: '100x80'
+      - series: 'ehlo_warmup_daily_limit_messages{cluster="eu", job="mail-ehlo", instance="a", route="self_hosted", source="mx-1", provider="gmail"}'
+        values: '1000x80'
+      - series: 'ehlo_warmup_sent_today_messages{cluster="eu", job="ehlo-staging", instance="s", route="self_hosted", source="mx-1", provider="gmail"}'
+        values: '1000x80'
+      - series: 'ehlo_warmup_daily_limit_messages{cluster="eu", job="ehlo-staging", instance="s", route="self_hosted", source="mx-1", provider="gmail"}'
+        values: '1000x80'
+    promql_expr_test:
+      - expr: ehlo:delivery:ratio_rate10m
+        eval_time: 12m
+        exp_samples:
+          - labels: 'ehlo:delivery:ratio_rate10m{cluster="eu", job="mail-ehlo", route="self_hosted"}'
+            value: 0.5
+          - labels: 'ehlo:delivery:ratio_rate10m{cluster="eu", job="ehlo-staging", route="self_hosted"}'
+            value: 0.25
+      - expr: ehlo:delivery:ratio_rate10m{cluster=~".*", job="mail-ehlo"}
+        eval_time: 12m
+        exp_samples:
+          - labels: 'ehlo:delivery:ratio_rate10m{cluster="eu", job="mail-ehlo", route="self_hosted"}'
+            value: 0.5
+      - expr: ALERTS{component="ehlo", alertstate="firing", cluster=~".*", job="mail-ehlo"}
+        eval_time: 12m
+        exp_samples: []
+      - expr: ALERTS{component="ehlo", alertstate="firing", cluster=~".*", job="ehlo-staging"}
+        eval_time: 12m
+        exp_samples:
+          - labels: 'ALERTS{alertname="EhloLaneAtDailyLimit", alertstate="firing", component="ehlo", severity="info", cluster="eu", job="ehlo-staging", source="mx-1", provider="gmail"}'
+            value: 1
+          - labels: 'ALERTS{alertname="EhloProviderCapacityExhausted", alertstate="firing", component="ehlo", severity="critical", cluster="eu", job="ehlo-staging", provider="gmail"}'
+            value: 1
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: EhloLaneAtDailyLimit
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: info
+              cluster: eu
+              job: ehlo-staging
+              source: mx-1
+              provider: gmail
+            exp_annotations:
+              summary: mx-1 reached its daily limit toward gmail
+              description: "Expected during warmup. Send the rest of today's mail to gmail through another server."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlolaneatdailylimit
+              dashboard_uid: staging-warmup

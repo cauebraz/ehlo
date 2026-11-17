@@ -1,0 +1,45 @@
+{{- with .Values.podMonitor }}
+{{- if .enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ include "ehlo.fullname" $ }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "ehlo.labels" $ | nindent 4 }}
+    {{- with .labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "ehlo.selectorLabels" $ | nindent 6 }}
+  namespaceSelector:
+    matchNames:
+      - {{ $.Release.Namespace }}
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+      interval: {{ .interval }}
+      scrapeTimeout: {{ .scrapeTimeout }}
+      {{- if or .job .relabelings }}
+      relabelings:
+        {{- with .job }}
+        - action: replace
+          targetLabel: job
+          replacement: {{ . | quote }}
+        {{- end }}
+        {{- with .relabelings }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      {{- with .metricRelabelings }}
+      metricRelabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+{{- end }}

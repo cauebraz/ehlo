@@ -1,0 +1,23 @@
+name: Feature request
+description: A signal, provider behavior or policy rule ehlo should cover.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What an operator sees today
+      description: The symptom, the provider reply, or the decision that goes wrong.
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Primary source
+      description: The provider documentation, RFC, incident report or MTA documentation that describes the behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The event field, metric, alert, category or policy rule that would cover it.

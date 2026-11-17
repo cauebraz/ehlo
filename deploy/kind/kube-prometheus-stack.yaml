@@ -1,0 +1,83 @@
+# kube-prometheus-stack values for the kind end-to-end test
+# (deploy/scripts/kind-e2e.sh): Prometheus, the operator and Grafana 13.3.1
+# with the dashboard sidecar. Alertmanager and the node and cluster
+# exporters are off to keep the test small. Every image the install pulls
+# is pinned by index digest; the tags are the chart 93.3.1 defaults.
+alertmanager:
+  enabled: false
+nodeExporter:
+  enabled: false
+kubeStateMetrics:
+  enabled: false
+defaultRules:
+  create: false
+kubeApiServer:
+  enabled: false
+kubelet:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+kubeEtcd:
+  enabled: false
+coreDns:
+  enabled: false
+prometheusOperator:
+  image:
+    registry: quay.io
+    repository: prometheus-operator/prometheus-operator
+    tag: v0.95.2
+    sha: 7986c2afa118c9dea07d01c5e1a29555824582e92f6ee8607591d1a7178acf29
+  prometheusConfigReloader:
+    image:
+      registry: quay.io
+      repository: prometheus-operator/prometheus-config-reloader
+      tag: v0.95.2
+      sha: cc74ddedad4ab1c49446971f6d51302ad4303d8660a2018af925c7f62c114304
+  thanosImage:
+    registry: quay.io
+    repository: thanos/thanos
+    tag: v0.42.5
+    sha: 0a546b98a8dd47735456ab389983675ee363d68127e334937a9fceeea10da5e7
+  admissionWebhooks:
+    patch:
+      image:
+        registry: ghcr.io
+        repository: jkroepke/kube-webhook-certgen
+        tag: 1.11.1
+        sha: 8009b04f9873f7279b5adee37fdd03b6a9aa7b6751d4f69fde2683010e41cd1f
+prometheus:
+  prometheusSpec:
+    image:
+      registry: quay.io
+      repository: prometheus/prometheus
+      tag: v3.16.0-distroless
+      sha: 9764044e09eb2c9e1abdb12d0f0188d4efb7384b0262d3c080f0fc59045c89ba
+    evaluationInterval: 15s
+    scrapeInterval: 15s
+grafana:
+  testFramework:
+    enabled: false
+  image:
+    registry: docker.io
+    repository: grafana/grafana
+    tag: 13.3.1
+    sha: 0615ec4fbd4072004b7d86b46ded63013a74b7d6eb1119273dd89e8fa25c13cf
+  sidecar:
+    image:
+      registry: quay.io
+      repository: kiwigrid/k8s-sidecar
+      tag: 2.14.3
+      sha: 52d311dcedd587421a236c4d6c621f05614c40a51386e955e0699dca97ec0880
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: ALL
+      folderAnnotation: grafana_folder
+      provider:
+        foldersFromFilesStructure: true
+  defaultDashboardsEnabled: false

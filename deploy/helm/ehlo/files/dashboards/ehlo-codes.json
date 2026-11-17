@@ -1,0 +1,1008 @@
+{
+  "apiVersion": "dashboard.grafana.app/v2",
+  "kind": "Dashboard",
+  "metadata": {
+    "name": "ehlo-codes"
+  },
+  "spec": {
+    "annotations": [
+      {
+        "kind": "AnnotationQuery",
+        "spec": {
+          "enable": true,
+          "hide": false,
+          "iconColor": "red",
+          "legacyOptions": {
+            "expr": "ALERTS{component=\"ehlo\", alertstate=\"firing\", severity!=\"info\"}",
+            "step": "15s",
+            "textFormat": "{{source}} {{provider}} {{code}}",
+            "titleFormat": "{{alertname}}",
+            "useValueForTime": false
+          },
+          "name": "Alerts",
+          "query": {
+            "datasource": {
+              "name": "${datasource}"
+            },
+            "group": "prometheus",
+            "kind": "DataQuery",
+            "spec": {},
+            "version": "v0"
+          }
+        }
+      }
+    ],
+    "cursorSync": "Crosshair",
+    "description": "What each SMTP reply means, what the provider says about it, and what to do. The reply-code charts link here.",
+    "editable": false,
+    "elements": {
+      "panel-1000": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Gmail sees an unusual rate of mail from the IP, the netblock or the domain and defers.",
+          "id": 1000,
+          "links": [],
+          "title": "421 4.7.28 (gmail)",
+          "vizConfig": {
+            "group": "text",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": ""
+                },
+                "overrides": []
+              },
+              "options": {
+                "content": "**What it means.** Gmail sees an unusual rate of mail from the IP, the netblock or the domain and defers.\n\n**What Google says.** Gmail has detected an unusual rate of email. To protect our users from spam, email has been temporarily rate limited. Review the Email sender guidelines.\n\n**What to do.** ehlo already stops the lane for 10 minutes and halves its hourly allowance. If it repeats daily, the warmup ramp is too steep for this IP: lower growth.gmail or the source's target.\n\nCategory: `rate_limited`. Back: use the browser back button or the dashboard list above.",
+                "mode": "markdown"
+              }
+            },
+            "version": "13.3.1"
+          }
+        }
+      },
+      "panel-1001": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "A temporary refusal. The text says which: low IP reputation, a missing PTR, or a plain try again later.",
+          "id": 1001,
+          "links": [],
+          "title": "421 4.7.0 (gmail)",
+          "vizConfig": {
+            "group": "text",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": ""
+                },
+                "overrides": []
+              },
+              "options": {
+                "content": "**What it means.** A temporary refusal. The text says which: low IP reputation, a missing PTR, or a plain try again later.\n\n**What Google says.** Retry later. For the PTR variant, publish a reverse DNS record whose forward lookup returns the IP.\n\n**What to do.** Read the reply text in the Delivery dashboard. Low reputation at volume means the lane grew faster than the reputation did.\n\nCategory: `busy`. Back: use the browser back button or the dashboard list above.",
+                "mode": "markdown"
+              }
+            },
+            "version": "13.3.1"
+          }
+        }
+      },
+      "panel-1002": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Gmail rate limits the mail because the connection has no TLS.",
+          "id": 1002,
+          "links": [],
+          "title": "421 4.7.29 (gmail)",
+          "vizConfig": {
+            "group": "text",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": ""
+                },
+                "overrides": []
+              },
+              "options": {
+                "content": "**What it means.** Gmail rate limits the mail because the connection has no TLS.\n\n**What Google says.** Use a TLS connection for every message.\n\n**What to do.** Enable opportunistic or mandatory TLS on the Postfix transport (smtp_tls_security_level = may or encrypt) and check the Encrypted connections panel on the Delivery dashboard.\n\nCategory: `auth_failure`. Back: use the browser back button or the dashboard list above.",
+                "mode": "markdown"
+              }
+            },
+            "version": "13.3.1"
+          }
+        }
+      },
+      "panel-1003": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "One recipient receives mail faster than Gmail allows. This is about the mailbox, not the IP.",
+          "id": 1003,
+          "links": [],
+          "title": "450 4.2.1 (gmail)",
+          "vizConfig": {
+            "group": "text",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": ""
+                },
+                "overrides": []
+              },
+              "options": {
+                "content": "**What it means.** One recipient receives mail faster than Gmail allows. This is about the mailbox, not the IP.\n\n**What Google says.** Resend later.\n\n**What to do.** No lane action. A burst to one address, often a shared inbox or a list.\n\nCategory: `busy`. Back: use the browser back button or the dashboard list above.",
+                "mode": "markdown"
+              }
+            },
+            "version": "13.3.1"
+          }
+        }
+      },
+      "panel-1004": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "The mailbox is over quota.",
+          "id": 1004,
+          "links": [],
+          "title": "452 4.2.2 (gmail)",
+          "vizConfig": {
+            "group": "text",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": ""
+                },
+                "overrides": []
+              },
+              "options": {
+                "content": "**What it means.** The mailbox is over quota.\n\n**What Google says.** Resend later.\n\n**What to do.** No lane action. Postfix retries until maximal_queue_lifetime, then returns a soft bounce.\n\nCategory: `mailbox_full`. Back: use the browser back button or the dashboard list above.",
+                "mode": "markdown"
+              }
+            },
+            "version": "13.3.1"
+          }
+        }
+      },
+      "panel-1005": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "The address does not exist.",
+          "id": 1005,
+          "links": [],
+          "title": "550 5.1.1 (gmail)",
+          "vizConfig": {
+            "group": "text",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": ""
+                },
+                "overrides": []
+              },
+              "options": {
+                "content": "**What it means.** The address does not exist.\n\n**What Google says.** Do not resend.\n\n**What to do.** Suppress the address in your list on the first occurrence. A list with many of these is heading for spam traps.\n\nCategory: `invalid_recipient`. Back: use the browser back button or the dashboard list above.",
+                "mode": "markdown"
+              }
+            },
+            "version": "13.3.1"
+          }
+        }
+      },
+      "panel-1006": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Two meanings share this code: a recipient or domain policy refused the message, or Gmail judged it likely unsolicited.",
+          "id": 1006,
+          "links": [],
+          "title": "550 5.7.1 (gmail)",
+          "vizConfig": {
+            "group": "text",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": ""
+                },
+                "overrides": []
+              },
+              "options": {
+                "content": "**What it means.** Two meanings share this code: a recipient or domain policy refused the message, or Gmail judged it likely unsolicited.\n\n**What Google says.** For the policy variant, nothing to do on your side. For the unsolicited variant, review the content and the list.\n\n**What to do.** Check the reply text. The unsolicited variant on many recipients is a reputation problem and counts toward the block rule.\n\nCategory: `policy`. Back: use the browser back button or the dashboard list above.",
+                "mode": "markdown"
+              }
+            },
+            "version": "13.3.1"
+          }
+        }
+      },
+      "panel-1007": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "The message was not authenticated: neither SPF nor DKIM passed.",
+          "id": 1007,
+          "links": [],
+          "title": "550 5.7.26 (gmail)",
+          "vizConfig": {
+            "group": "text",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": ""
+                },
+                "overrides": []
+              },
+              "options": {
+                "content": "**What it means.** The message was not authenticated: neither SPF nor DKIM passed.\n\n**What Google says.** Set up SPF or DKIM for the sending domain. Bulk senders need both.\n\n**What to do.** Check the DKIM signer and the SPF record of the Return-Path domain. Nothing about the recipients changes this.\n\nCategory: `auth_failure`. Back: use the browser back button or the dashboard list above.",
+                "mode": "markdown"
+              }
+            },
+            "version": "13.3.1"
+          }
+        }
+      },
+      "panel-1008": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Gmail blocks the IP for an unusual rate of unsolicited mail. The permanent twin of 421 4.7.28.",
+          "id": 1008,
+          "links": [],
+          "title": "550 5.7.28 (gmail)",
+          "vizConfig": {
+            "group": "text",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": ""
+                },
+                "overrides": []
+              },
+              "options": {
+                "content": "**What it means.** Gmail blocks the IP for an unusual rate of unsolicited mail. The permanent twin of 421 4.7.28.\n\n**What Google says.** Review sending practices and the Gmail sender guidelines.\n\n**What to do.** ehlo stops the lane for the day. Check Postmaster Tools for the IP and domain reputation before resuming.\n\nCategory: `reputation_block`. Back: use the browser back button or the dashboard list above.",
+                "mode": "markdown"
+              }
+            },
+            "version": "13.3.1"
+          }
+        }
+      },
+      "panel-1009": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Microsoft rate limits the IP for reputation. Common on new IPs and after a volume jump.",
+          "id": 1009,
+          "links": [],
+          "title": "451 4.7.650 S775 (outlook)",
+          "vizConfig": {
+            "group": "text",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": ""
+                },
+                "overrides": []
+              },
+              "options": {
+                "content": "**What it means.** Microsoft rate limits the IP for reputation. Common on new IPs and after a volume jump.\n\n**What Microsoft says.** Keep retrying later. Check the IP in SNDS.\n\n**What to do.** The lane backs off. If the IP is new, the ramp toward Microsoft is too fast: growth.outlook defaults to 1.3 for this reason.\n\nCategory: `rate_limited`. Back: use the browser back button or the dashboard list above.",
+                "mode": "markdown"
+              }
+            },
+            "version": "13.3.1"
+          }
+        }
+      },
+      "panel-1010": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Microsoft limits the IP's rate because of its IP or domain reputation.",
+          "id": 1010,
+          "links": [],
+          "title": "421 RP-001 (outlook)",
+          "vizConfig": {
+            "group": "text",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": ""
+                },
+                "overrides": []
+              },
+              "options": {
+                "content": "**What it means.** Microsoft limits the IP's rate because of its IP or domain reputation.\n\n**What Microsoft says.** Improve the reputation of the sending IP and domain. Check the IP in SNDS.\n\n**What to do.** Lower shaping.outlook.connections and per_connection, and let the backoff run.\n\nCategory: `rate_limited`. Back: use the browser back button or the dashboard list above.",
+                "mode": "markdown"
+              }
+            },
+            "version": "13.3.1"
+          }
+        }
+      },
+      "panel-1011": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "The IP, or part of its netblock, is on Microsoft's block list.",
+          "id": 1011,
+          "links": [],
+          "title": "550 5.7.1 S3150 (outlook)",
+          "vizConfig": {
+            "group": "text",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": ""
+                },
+                "overrides": []
+              },
+              "options": {
+                "content": "**What it means.** The IP, or part of its netblock, is on Microsoft's block list.\n\n**What Microsoft says.** Open a ticket with Outlook.com sender support and check SNDS.\n\n**What to do.** ehlo stops the lane for the day. Delisting takes a ticket; sending more does not help.\n\nCategory: `reputation_block`. Back: use the browser back button or the dashboard list above.",
+                "mode": "markdown"
+              }
+            },
+            "version": "13.3.1"
+          }
+        }
+      },
+      "panel-1012": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "A sender over 5,000 messages a day failed SPF, DKIM or DMARC. Microsoft rejects these messages from May 5, 2025.",
+          "id": 1012,
+          "links": [],
+          "title": "550 5.7.515 (outlook)",
+          "vizConfig": {
+            "group": "text",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": ""
+                },
+                "overrides": []
+              },
+              "options": {
+                "content": "**What it means.** A sender over 5,000 messages a day failed SPF, DKIM or DMARC. Microsoft rejects these messages from May 5, 2025.\n\n**What Microsoft says.** Pass SPF and DKIM and publish a DMARC record aligned with the From domain.\n\n**What to do.** Check the three records for the domain. The Sent in the last 24 hours tile on the Microsoft dashboard shows whether you are above the line.\n\nCategory: `auth_failure`. Back: use the browser back button or the dashboard list above.",
+                "mode": "markdown"
+              }
+            },
+            "version": "13.3.1"
+          }
+        }
+      },
+      "panel-1013": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "Yahoo defers the IP for unexpected volume or user complaints.",
+          "id": 1013,
+          "links": [],
+          "title": "421 4.7.0 TSS04 (yahoo)",
+          "vizConfig": {
+            "group": "text",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": ""
+                },
+                "overrides": []
+              },
+              "options": {
+                "content": "**What it means.** Yahoo defers the IP for unexpected volume or user complaints.\n\n**What Yahoo says.** Reduce volume, ramp gradually, and open a Sender Support request if it persists.\n\n**What to do.** The lane backs off. A new IP toward Yahoo ramps at 1.35x by default; if TSS04 repeats, lower it.\n\nCategory: `rate_limited`. Back: use the browser back button or the dashboard list above.",
+                "mode": "markdown"
+              }
+            },
+            "version": "13.3.1"
+          }
+        }
+      },
+      "panel-1014": {
+        "kind": "Panel",
+        "spec": {
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [],
+              "queryOptions": {},
+              "transformations": []
+            }
+          },
+          "description": "All mail from the IP is permanently deferred.",
+          "id": 1014,
+          "links": [],
+          "title": "553 5.7.2 TSS11 (yahoo)",
+          "vizConfig": {
+            "group": "text",
+            "kind": "VizConfig",
+            "spec": {
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "unit": ""
+                },
+                "overrides": []
+              },
+              "options": {
+                "content": "**What it means.** All mail from the IP is permanently deferred.\n\n**What Yahoo says.** Open a Yahoo Sender Support request.\n\n**What to do.** ehlo stops the lane for the day. Nothing you send clears this; the support request does.\n\nCategory: `reputation_block`. Back: use the browser back button or the dashboard list above.",
+                "mode": "markdown"
+              }
+            },
+            "version": "13.3.1"
+          }
+        }
+      }
+    },
+    "layout": {
+      "kind": "RowsLayout",
+      "spec": {
+        "rows": [
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "collapse": false,
+              "layout": {
+                "kind": "AutoGridLayout",
+                "spec": {
+                  "columnWidth": 448,
+                  "columnWidthMode": "custom",
+                  "fillScreen": false,
+                  "items": [
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-1000"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-1009"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-1010"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-1013"
+                        }
+                      }
+                    }
+                  ],
+                  "maxColumnCount": 2,
+                  "rowHeightMode": "standard"
+                }
+              },
+              "title": "rate limited"
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "collapse": false,
+              "layout": {
+                "kind": "AutoGridLayout",
+                "spec": {
+                  "columnWidth": 448,
+                  "columnWidthMode": "custom",
+                  "fillScreen": false,
+                  "items": [
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-1001"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-1003"
+                        }
+                      }
+                    }
+                  ],
+                  "maxColumnCount": 2,
+                  "rowHeightMode": "standard"
+                }
+              },
+              "title": "busy"
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "collapse": false,
+              "layout": {
+                "kind": "AutoGridLayout",
+                "spec": {
+                  "columnWidth": 448,
+                  "columnWidthMode": "custom",
+                  "fillScreen": false,
+                  "items": [
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-1002"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-1007"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-1012"
+                        }
+                      }
+                    }
+                  ],
+                  "maxColumnCount": 2,
+                  "rowHeightMode": "standard"
+                }
+              },
+              "title": "auth failure"
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "collapse": false,
+              "layout": {
+                "kind": "AutoGridLayout",
+                "spec": {
+                  "columnWidth": 448,
+                  "columnWidthMode": "custom",
+                  "fillScreen": false,
+                  "items": [
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-1004"
+                        }
+                      }
+                    }
+                  ],
+                  "maxColumnCount": 2,
+                  "rowHeightMode": "standard"
+                }
+              },
+              "title": "mailbox full"
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "collapse": false,
+              "layout": {
+                "kind": "AutoGridLayout",
+                "spec": {
+                  "columnWidth": 448,
+                  "columnWidthMode": "custom",
+                  "fillScreen": false,
+                  "items": [
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-1005"
+                        }
+                      }
+                    }
+                  ],
+                  "maxColumnCount": 2,
+                  "rowHeightMode": "standard"
+                }
+              },
+              "title": "invalid recipient"
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "collapse": false,
+              "layout": {
+                "kind": "AutoGridLayout",
+                "spec": {
+                  "columnWidth": 448,
+                  "columnWidthMode": "custom",
+                  "fillScreen": false,
+                  "items": [
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-1006"
+                        }
+                      }
+                    }
+                  ],
+                  "maxColumnCount": 2,
+                  "rowHeightMode": "standard"
+                }
+              },
+              "title": "policy"
+            }
+          },
+          {
+            "kind": "RowsLayoutRow",
+            "spec": {
+              "collapse": false,
+              "layout": {
+                "kind": "AutoGridLayout",
+                "spec": {
+                  "columnWidth": 448,
+                  "columnWidthMode": "custom",
+                  "fillScreen": false,
+                  "items": [
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-1008"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-1011"
+                        }
+                      }
+                    },
+                    {
+                      "kind": "AutoGridLayoutItem",
+                      "spec": {
+                        "element": {
+                          "kind": "ElementReference",
+                          "name": "panel-1014"
+                        }
+                      }
+                    }
+                  ],
+                  "maxColumnCount": 2,
+                  "rowHeightMode": "standard"
+                }
+              },
+              "title": "reputation block"
+            }
+          }
+        ]
+      }
+    },
+    "links": [
+      {
+        "asDropdown": true,
+        "icon": "external link",
+        "includeVars": true,
+        "keepTime": true,
+        "tags": [
+          "ehlo"
+        ],
+        "targetBlank": false,
+        "title": "Other dashboards",
+        "tooltip": "",
+        "type": "dashboards"
+      }
+    ],
+    "preload": false,
+    "tags": [
+      "smtp",
+      "email",
+      "ehlo"
+    ],
+    "timeSettings": {
+      "autoRefresh": "30s",
+      "autoRefreshIntervals": [
+        "30s",
+        "1m",
+        "5m",
+        "15m",
+        "1h"
+      ],
+      "fiscalYearStartMonth": 0,
+      "from": "now-3h",
+      "hideTimepicker": false,
+      "timezone": "utc",
+      "to": "now"
+    },
+    "title": "ehlo / Reply codes",
+    "variables": [
+      {
+        "kind": "DatasourceVariable",
+        "spec": {
+          "allowCustomValue": true,
+          "current": {
+            "text": "default",
+            "value": "default"
+          },
+          "hide": "dontHide",
+          "includeAll": false,
+          "label": "Data source",
+          "multi": false,
+          "name": "datasource",
+          "options": [],
+          "pluginId": "prometheus",
+          "refresh": "onDashboardLoad",
+          "regex": "",
+          "skipUrlSync": false
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "allValue": ".*",
+          "allowCustomValue": true,
+          "current": {
+            "text": [
+              "All"
+            ],
+            "value": [
+              "$__all"
+            ]
+          },
+          "definition": "label_values(ehlo_smtp_attempts_total{route=\"self_hosted\"}, source)",
+          "hide": "dontHide",
+          "includeAll": true,
+          "label": "Server",
+          "multi": true,
+          "name": "source",
+          "options": [],
+          "query": {
+            "datasource": {
+              "name": "${datasource}"
+            },
+            "group": "prometheus",
+            "kind": "DataQuery",
+            "spec": {
+              "qryType": 1,
+              "query": "label_values(ehlo_smtp_attempts_total{route=\"self_hosted\"}, source)",
+              "refId": "PrometheusVariableQueryEditor-VariableQuery"
+            },
+            "version": "v0"
+          },
+          "refresh": "onTimeRangeChanged",
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": "naturalAsc"
+        }
+      },
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "allValue": ".*",
+          "allowCustomValue": true,
+          "current": {
+            "text": [
+              "All"
+            ],
+            "value": [
+              "$__all"
+            ]
+          },
+          "definition": "label_values(ehlo_smtp_attempts_total, provider)",
+          "hide": "dontHide",
+          "includeAll": true,
+          "label": "Provider",
+          "multi": true,
+          "name": "provider",
+          "options": [],
+          "query": {
+            "datasource": {
+              "name": "${datasource}"
+            },
+            "group": "prometheus",
+            "kind": "DataQuery",
+            "spec": {
+              "qryType": 1,
+              "query": "label_values(ehlo_smtp_attempts_total, provider)",
+              "refId": "PrometheusVariableQueryEditor-VariableQuery"
+            },
+            "version": "v0"
+          },
+          "refresh": "onTimeRangeChanged",
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": "naturalAsc"
+        }
+      }
+    ]
+  }
+}

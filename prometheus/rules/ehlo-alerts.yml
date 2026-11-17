@@ -1,0 +1,236 @@
+groups:
+  - name: ehlo-alerts
+    interval: 15s
+    rules:
+      - alert: EhloTelemetryAbsent
+        expr: |-
+          up == 0 and on (job, instance) present_over_time(ehlo_build_info[1d])
+          or
+          (
+            absent(ehlo_build_info)
+            unless on () (up == 0 and on (job, instance) present_over_time(ehlo_build_info[1d]))
+          )
+        for: 1m
+        labels:
+          component: ehlo
+          severity: critical
+        annotations:
+          summary: Prometheus cannot scrape the ehlo server
+          description: No metrics from ehlo for over 1 minute, so no other ehlo alert can fire. First check that the ehlo process runs and answers on /metrics, then the scrape target in Prometheus.
+          runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlotelemetryabsent
+          dashboard_uid: ehlo-pipeline
+      - alert: EhloIngestInvalidEvents
+        expr: |-
+          sum by (type) (rate(ehlo_events_total{result="invalid"}[10m]))
+            / sum by (type) (rate(ehlo_events_total[10m])) > 0.01
+          and on (type)
+          sum by (type) (increase(ehlo_events_total{result="invalid"}[10m])) >= 5
+        for: 5m
+        labels:
+          component: ehlo
+          severity: warning
+        annotations:
+          summary: '{{ $value | humanizePercentage }} of {{ $labels.type }} events fail validation'
+          description: ehlo drops these events, so the dashboards undercount. First read the errors in the POST /v1/events response of the adapter that sends {{ $labels.type }} events.
+          runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloingestinvalidevents
+          dashboard_uid: ehlo-pipeline
+      - alert: EhloLaneAtDailyLimit
+        expr: ehlo:lane_quota_used:ratio >= 1
+        labels:
+          component: ehlo
+          severity: info
+        annotations:
+          summary: '{{ $labels.source }} reached its daily limit toward {{ $labels.provider }}'
+          description: Expected during warmup. Send the rest of today's mail to {{ $labels.provider }} through another server.
+          runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlolaneatdailylimit
+          dashboard_uid: ehlo-warmup
+      - alert: EhloProviderCapacityExhausted
+        expr: |-
+          count by (provider) (
+              ehlo:lane_quota_used:ratio > 0.9
+            or on (source, provider)
+              max by (source, provider) (ehlo_warmup_state{state=~"paused|blocked"}) == 1
+          )
+            == count by (provider) (max by (source, provider) (ehlo_warmup_daily_limit_messages))
+        for: 2m
+        labels:
+          component: ehlo
+          severity: critical
+        annotations:
+          summary: No server has room left today for mail to {{ $labels.provider }}
+          description: Every server toward {{ $labels.provider }} is above 90% of its daily limit, paused or blocked. First send the overflow to {{ $labels.provider }} through an ESP.
+          runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloprovidercapacityexhausted
+          dashboard_uid: ehlo-warmup
+      - alert: EhloDKIMUnsigned
+        expr: ehlo:dkim_unsigned:ratio_rate10m > 0
+        for: 1m
+        labels:
+          component: ehlo
+          severity: critical
+        annotations:
+          summary: '{{ $labels.source }} sends mail without a DKIM signature ({{ $value | humanizePercentage }})'
+          description: Providers may reject or spam-folder this mail. First route mail away from {{ $labels.source }}, then restart its DKIM signer.
+          runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlodkimunsigned
+          dashboard_uid: ehlo-reputation
+      - alert: EhloProviderRateLimiting
+        expr: |-
+          ehlo:category:ratio_rate10m{category="rate_limited"} > 0.05
+          and on (source, provider)
+          sum by (source, provider) (increase(ehlo_reply_categories_total{route="self_hosted", category="rate_limited"}[10m])) >= 5
+        for: 2m
+        keep_firing_for: 10m
+        labels:
+          component: ehlo
+          severity: warning
+        annotations:
+          summary: '{{ $labels.provider }} slows down {{ $labels.source }} ({{ $value | humanizePercentage }} of attempts)'
+          description: '{{ $labels.provider }} asks {{ $labels.source }} to send less. The warmup engine already pauses the lane for 10 minutes. If this repeats, lower the target of {{ $labels.source }} for {{ $labels.provider }}.'
+          runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloproviderratelimiting
+          dashboard_uid: ehlo-delivery
+      - alert: EhloAuthenticationRejected
+        expr: sum by (source, provider) (increase(ehlo_reply_categories_total{route="self_hosted", category="auth_failure"}[10m])) > 0
+        for: 2m
+        labels:
+          component: ehlo
+          severity: critical
+        annotations:
+          summary: '{{ $labels.provider }} rejects mail from {{ $labels.source }} for failed SPF, DKIM, DMARC, TLS or reverse DNS'
+          description: '{{ $value | humanize }} replies in 10 minutes. First check the DNS records, the DKIM signer and the PTR of the sending IP of {{ $labels.source }}. Do not suppress the recipients.'
+          runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloauthenticationrejected
+          dashboard_uid: ehlo-reputation
+      - alert: EhloReputationBlock
+        expr: |-
+          ehlo:category:ratio_rate10m{category="reputation_block"} > 0.01
+          and on (source, provider)
+          sum by (source, provider) (increase(ehlo_reply_categories_total{route="self_hosted", category="reputation_block"}[10m])) >= 5
+        for: 2m
+        keep_firing_for: 10m
+        labels:
+          component: ehlo
+          severity: critical
+        annotations:
+          summary: '{{ $labels.provider }} blocks {{ $labels.source }} for reputation ({{ $value | humanizePercentage }} of attempts)'
+          description: The warmup engine stops the lane until the next day. First request delisting from {{ $labels.provider }} with the URL or code in the reply text. Do not retry 5xx replies.
+          runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloreputationblock
+          dashboard_uid: ehlo-reputation
+      - alert: EhloHardBounceRateHigh
+        expr: |-
+          ehlo:hard_bounce:ratio_rate10m{route="self_hosted"} > 0.025
+          and on (route, source, provider)
+          sum by (route, source, provider) (increase(ehlo_bounces_total{route="self_hosted", kind="hard"}[10m])) >= 5
+        for: 10m
+        labels:
+          component: ehlo
+          severity: warning
+        annotations:
+          summary: '{{ $value | humanizePercentage }} of mail from {{ $labels.source }} to {{ $labels.provider }} goes to addresses that do not exist'
+          description: A list with many invalid addresses hurts reputation. First find the campaign and suppress each address on its first hard bounce.
+          runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlohardbounceratehigh
+          dashboard_uid: ehlo-reputation
+      - alert: EhloFeedbackFeedStale
+        expr: |-
+          ehlo:feed_age_seconds{type=~"complaint|bounce"} > 1800
+          and on (route) (
+              sum by (route) (rate(ehlo_smtp_attempts_total[30m])) > 0
+            or
+              sum by (route) (rate(ehlo_delivered_total[30m])) > 0
+          )
+        for: 5m
+        labels:
+          component: ehlo
+          severity: warning
+        annotations:
+          summary: No {{ $labels.type }} event on route {{ $labels.route }} for {{ $value | humanizeDuration }} while it keeps sending
+          description: A webhook or feedback loop probably stopped. Until it is fixed, the {{ $labels.type }} rate reads zero and the warmup engine counts the day as clean. First check the adapter that sends {{ $labels.type }} events for route {{ $labels.route }}.
+          runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlofeedbackfeedstale
+          dashboard_uid: ehlo-pipeline
+      - alert: EhloConnectionFailures
+        expr: |-
+          ehlo:connect_failure:ratio_rate10m > 0.5
+          and on (source, provider)
+          sum by (source, provider) (increase(ehlo_smtp_connect_failures_total{route="self_hosted"}[10m])) >= 5
+        for: 2m
+        labels:
+          component: ehlo
+          severity: warning
+        annotations:
+          summary: '{{ $labels.source }} cannot connect to {{ $labels.provider }} ({{ $value | humanizePercentage }} of attempts)'
+          description: 'Sessions end before any mail is sent. First check whether other servers fail toward {{ $labels.provider }} too: if they do, the provider or the network is the cause; if not, check the IP, PTR and TLS of {{ $labels.source }}.'
+          runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloconnectionfailures
+          dashboard_uid: ehlo-delivery
+      - alert: EhloDeferredQueueGrowing
+        expr: |-
+          max by (source) (ehlo_queue_deferred_messages)
+            / on (source) sum by (source) (increase(ehlo_smtp_attempts_total{route="self_hosted", attempt="first"}[1d])) > 0.05
+          and on (source)
+          max by (source) (ehlo_queue_deferred_messages) > 1000
+        for: 10m
+        keep_firing_for: 5m
+        labels:
+          component: ehlo
+          severity: warning
+        annotations:
+          summary: '{{ $labels.source }} has mail waiting to retry, {{ $value | humanizePercentage }} of a day''s volume'
+          description: A provider defers or refuses mail from {{ $labels.source }}. First open Retry-later codes on the Delivery dashboard to see which replies.
+          runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlodeferredqueuegrowing
+          dashboard_uid: ehlo-delivery
+      - alert: EhloQueueFeedStale
+        expr: |-
+          group by (source) (present_over_time(ehlo_queue_deferred_messages[1d]))
+            unless on (source) ehlo_queue_deferred_messages
+          and on (source)
+          sum by (source) (rate(ehlo_smtp_attempts_total{route="self_hosted"}[30m])) > 0
+        for: 5m
+        labels:
+          component: ehlo
+          severity: warning
+        annotations:
+          summary: No queue event from {{ $labels.source }} for over 15 minutes while it keeps sending
+          description: ehlo drops the queue size of {{ $labels.source }} 15 minutes after its last queue event, so EhloDeferredQueueGrowing cannot fire for it. First check the job that posts queue events for {{ $labels.source }}.
+          runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloqueuefeedstale
+          dashboard_uid: ehlo-delivery
+      - alert: EhloComplaintRateHigh
+        expr: |-
+          sum by (source, provider) (increase(ehlo_complaints_total{route="self_hosted"}[24h]))
+            / sum by (source, provider) (increase(ehlo_delivered_total{route="self_hosted"}[24h])) > 0.003
+          and on (source, provider)
+          sum by (source, provider) (increase(ehlo_complaints_total{route="self_hosted"}[24h])) >= 5
+        for: 15m
+        labels:
+          component: ehlo
+          severity: critical
+        annotations:
+          summary: Recipients at {{ $labels.provider }} report {{ $value | humanizePercentage }} of mail from {{ $labels.source }} as spam
+          description: 'Gmail''s published guidance, used here for every provider: stay below 0.1% and never reach 0.3%. If every server rises together, the content or the list is the cause: first stop the campaign.'
+          runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlocomplaintratehigh
+          dashboard_uid: ehlo-reputation
+      - alert: EhloWarmupLanePaused
+        expr: max by (source, provider, state) (ehlo_warmup_state{state="paused"}) == 1
+        labels:
+          component: ehlo
+          severity: info
+        annotations:
+          summary: Warmup paused {{ $labels.source }} toward {{ $labels.provider }} for spam complaints
+          description: The lane sends nothing until it resumes at half its last good limit. Send mail to {{ $labels.provider }} through another server meanwhile.
+          runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlowarmuplanepaused
+          dashboard_uid: ehlo-warmup
+      - alert: EhloWarmupLaneBlocked
+        expr: max by (source, provider, state) (ehlo_warmup_state{state="blocked"}) == 1
+        labels:
+          component: ehlo
+          severity: critical
+        annotations:
+          summary: '{{ $labels.provider }} blocked {{ $labels.source }}, lane stopped until the next day'
+          description: Reputation block replies reached 1% of attempts. First request delisting, as in EhloReputationBlock, and send mail to {{ $labels.provider }} through another server.
+          runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlowarmuplaneblocked
+          dashboard_uid: ehlo-warmup
+      - alert: EhloDMARCUnauthenticatedSource
+        expr: sum by (source) (increase(ehlo_dmarc_messages_total{spf="fail", dkim="fail"}[1d])) > 0
+        labels:
+          component: ehlo
+          severity: warning
+        annotations:
+          summary: DMARC reports show mail from {{ $labels.source }} that fails both SPF and DKIM
+          description: '{{ $value | humanize }} messages in the last day. Either a service sends as your domain without SPF or DKIM set up, or someone spoofs the domain. First identify the sending IPs in the report.'
+          runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlodmarcunauthenticatedsource
+          dashboard_uid: ehlo-reputation

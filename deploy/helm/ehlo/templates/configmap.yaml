@@ -1,0 +1,27 @@
+{{- if not .Values.existingConfigSecret }}
+{{- $webhooks := default dict .Values.config.webhooks }}
+{{- if or $webhooks.token $webhooks.sendgrid_public_key }}
+{{- fail "config.webhooks holds a secret; set webhookSecret, or put the whole ehlo.yaml in a Secret and set existingConfigSecret" }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ehlo.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ehlo.labels" . | nindent 4 }}
+data:
+  {{- $config := omit .Values.config "listen" "state_path" }}
+  {{- with .Values.webhookSecret.name }}
+  {{- $files := dict }}
+  {{- if $.Values.webhookSecret.tokenKey }}
+  {{- $_ := set $files "token_file" (printf "/etc/ehlo-secrets/%s" $.Values.webhookSecret.tokenKey) }}
+  {{- end }}
+  {{- if $.Values.webhookSecret.sendgridPublicKeyKey }}
+  {{- $_ := set $files "sendgrid_public_key_file" (printf "/etc/ehlo-secrets/%s" $.Values.webhookSecret.sendgridPublicKeyKey) }}
+  {{- end }}
+  {{- $config = merge (dict "webhooks" (merge $files $webhooks)) $config }}
+  {{- end }}
+  ehlo.yaml: |
+    {{- merge (dict "listen" ":8080" "state_path" "/data/warmup.json") $config | toYaml | nindent 4 }}
+{{- end }}

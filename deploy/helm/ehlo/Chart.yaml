@@ -1,0 +1,19 @@
+apiVersion: v2
+name: ehlo
+description: Email deliverability monitor and warmup pacer for mail servers
+type: application
+version: 0.0.0
+appVersion: "0.0.0"
+kubeVersion: ">=1.30.0-0"
+home: https://github.com/cauebraz/ehlo
+sources:
+  - https://github.com/cauebraz/ehlo
+keywords:
+  - email
+  - deliverability
+  - warmup
+  - prometheus
+  - grafana
+annotations:
+  org.opencontainers.image.source: https://github.com/cauebraz/ehlo
+  org.opencontainers.image.licenses: MIT

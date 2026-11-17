@@ -1,0 +1,43 @@
+[Unit]
+Description=ehlo Postfix tailer reading the systemd journal
+Documentation=https://github.com/cauebraz/ehlo/blob/main/docs/integrations.md
+After=network-online.target postfix.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=EHLO_SOURCE=mx-1
+Environment=EHLO_TARGET=http://127.0.0.1:8080
+EnvironmentFile=-/etc/default/ehlo-tail-postfix
+ExecStart=/bin/sh -c 'journalctl --follow --lines=0 --output=short-iso --unit="postfix*" | /usr/local/bin/ehlo tail-postfix -source "$EHLO_SOURCE" -target "$EHLO_TARGET" -file -'
+Restart=always
+RestartSec=5s
+DynamicUser=yes
+SupplementaryGroups=systemd-journal
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectHostname=yes
+ProtectClock=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

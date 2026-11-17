@@ -1,0 +1,3 @@
+type,timeLogged,feedbackType,rcpt
+f,2026-03-10 09:00:00+0000,abuse,user1@gmail.com
+f,2026-03-10 09:00:01+0000,not-spam,user1@gmail.com

@@ -1,0 +1,49 @@
+groups:
+  - name: ehlo-recording
+    interval: 15s
+    rules:
+      - record: ehlo:lane_quota_used:ratio
+        expr: |-
+          max by (source, provider) (ehlo_warmup_sent_today_messages)
+            / (max by (source, provider) (ehlo_warmup_daily_limit_messages) > 0)
+      - record: ehlo:smtp_deferral:ratio_rate10m
+        expr: |-
+          sum by (source, provider, code) (rate(ehlo_smtp_replies_total{route="self_hosted", class="4xx"}[10m]))
+            / ignoring (code) group_left
+          sum by (source, provider) (rate(ehlo_smtp_attempts_total{route="self_hosted"}[10m]))
+      - record: ehlo:connect_failure:ratio_rate10m
+        expr: |-
+          sum by (source, provider) (rate(ehlo_smtp_connect_failures_total{route="self_hosted"}[10m]))
+            / sum by (source, provider) (rate(ehlo_smtp_attempts_total{route="self_hosted"}[10m]))
+      - record: ehlo:complaint:ratio_rate10m
+        expr: |-
+          sum by (route, source, provider) (rate(ehlo_complaints_total[10m]))
+            / sum by (route, source, provider) (rate(ehlo_delivered_total[10m]))
+      - record: ehlo:bounce:ratio_rate10m
+        expr: |-
+          sum by (route, kind) (rate(ehlo_bounces_total[10m]))
+            / ignoring (kind) group_left
+          sum by (route) (rate(ehlo_smtp_attempts_total{attempt="first"}[10m]))
+      - record: ehlo:delivery:ratio_rate10m
+        expr: |-
+          sum by (route) (rate(ehlo_delivered_total[10m]))
+            / sum by (route) (rate(ehlo_smtp_attempts_total{attempt="first"}[10m]))
+      - record: ehlo:open:ratio_rate10m
+        expr: |-
+          sum by (route) (rate(ehlo_opens_total[10m]))
+            / sum by (route) (rate(ehlo_delivered_total[10m]))
+      - record: ehlo:dkim_unsigned:ratio_rate10m
+        expr: |-
+          sum by (source) (rate(ehlo_dkim_messages_total{result="unsigned"}[10m]))
+            / sum by (source) (rate(ehlo_dkim_messages_total{result!="unknown"}[10m]))
+      - record: ehlo:category:ratio_rate10m
+        expr: |-
+          sum by (source, provider, category) (rate(ehlo_reply_categories_total{route="self_hosted", category!="delivered"}[10m]))
+            / ignoring (category) group_left
+          sum by (source, provider) (rate(ehlo_smtp_attempts_total{route="self_hosted"}[10m]))
+      - record: ehlo:hard_bounce:ratio_rate10m
+        expr: |-
+          sum by (route, source, provider) (rate(ehlo_bounces_total{kind="hard"}[10m]))
+            / sum by (route, source, provider) (rate(ehlo_smtp_attempts_total{attempt="first"}[10m]))
+      - record: ehlo:feed_age_seconds
+        expr: time() - max by (route, type) (ehlo_route_last_event_timestamp_seconds)

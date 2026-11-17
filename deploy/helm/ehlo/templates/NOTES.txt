@@ -1,0 +1,13 @@
+ehlo runs as one replica in {{ .Release.Namespace }}.
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "ehlo.fullname" . }} 8080:{{ .Values.service.port }}
+  curl -s localhost:8080/healthz
+
+{{- if not .Values.persistence.enabled }}
+
+persistence.enabled is false: the warmup state is lost on every restart.
+{{- end }}
+{{- if and (not .Values.serviceMonitor.enabled) (not .Values.podMonitor.enabled) }}
+
+No ServiceMonitor or PodMonitor: point your Prometheus at port http, path /metrics.
+{{- end }}

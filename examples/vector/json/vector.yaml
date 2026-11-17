@@ -1,0 +1,72 @@
+sources:
+  mta_log:
+    type: file
+    include:
+      - /var/log/mta/delivery.json
+    read_from: end
+
+transforms:
+  mta_events:
+    type: remap
+    inputs: [mta_log]
+    drop_on_abort: true
+    drop_on_error: true
+    source: |
+      parsed, err = parse_json(string!(.message))
+      if err != null { abort }
+      r = object(parsed) ?? {}
+      status = downcase(string(r.status) ?? "")
+      if !includes(["sent", "deferred", "bounced", "expired", "complaint"], status) { abort }
+      at = parse_timestamp(r.time, "%+") ?? now()
+      src = string(r.pool) ?? string(r.ip) ?? "mta"
+      rcpt = downcase(string(r.rcpt) ?? "")
+      parts = split(rcpt, "@")
+      domain = ""
+      if length(parts) > 1 { domain = string!(parts[-1]) }
+      base = {"v": 1, "time": at, "source": src, "domain": domain}
+      if status == "complaint" {
+        . = merge(base, {"type": "complaint"})
+      } else if status == "expired" {
+        . = merge(base, {"type": "bounce", "bounce": "soft"})
+      } else {
+        att = merge(base, {"type": "attempt", "attempt": "first"})
+        if (to_int(r.attempt) ?? 1) > 1 { att.attempt = "retry" }
+        reply = merge(base, {"type": "reply", "text": truncate(string(r.response) ?? "", 128)})
+        code = to_int(r.code) ?? 0
+        if code == 0 {
+          reply.stage = "connect"
+        } else {
+          reply.code = code
+          enhanced = string(r.enhanced) ?? ""
+          if enhanced != "" { reply.enhanced = enhanced }
+        }
+        queued = parse_timestamp(r.queued_at, "%+") ?? null
+        if queued != null {
+          d = to_float(to_unix_timestamp(at, unit: "milliseconds") - to_unix_timestamp!(queued, unit: "milliseconds")) / 1000.0
+          if d > 0 { reply.delay = d }
+        }
+        if status == "bounced" {
+          kind = "hard"
+          if starts_with(string(r.enhanced) ?? "", "5.7.") { kind = "policy" }
+          . = [att, reply, merge(base, {"type": "bounce", "bounce": kind})]
+        } else {
+          . = [att, reply]
+        }
+      }
+
+sinks:
+  ehlo:
+    type: http
+    inputs: [mta_events]
+    uri: http://127.0.0.1:8080/v1/events
+    method: post
+    encoding:
+      codec: json
+    framing:
+      method: newline_delimited
+    request:
+      headers:
+        Content-Type: application/x-ndjson
+    batch:
+      max_events: 1000
+      timeout_secs: 2

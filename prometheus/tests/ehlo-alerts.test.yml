@@ -1,0 +1,823 @@
+rule_files:
+  - ../rules/ehlo-recording.yml
+  - ../rules/ehlo-alerts.yml
+
+evaluation_interval: 15s
+
+tests:
+  - name: telemetry absent fires when the scrape fails
+    interval: 15s
+    input_series:
+      - series: 'up{job="ehlo", instance="ehlo:8080"}'
+        values: '1x4 0x10'
+      - series: 'ehlo_build_info{job="ehlo", instance="ehlo:8080", version="v1.0.0"}'
+        values: '1x4 stale'
+      - series: 'up{job="node", instance="node:9100"}'
+        values: '0x14'
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: EhloTelemetryAbsent
+        exp_alerts: []
+      - eval_time: 2m30s
+        alertname: EhloTelemetryAbsent
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: critical
+              job: ehlo
+              instance: ehlo:8080
+            exp_annotations:
+              summary: Prometheus cannot scrape the ehlo server
+              description: No metrics from ehlo for over 1 minute, so no other ehlo alert can fire. First check that the ehlo process runs and answers on /metrics, then the scrape target in Prometheus.
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlotelemetryabsent
+              dashboard_uid: ehlo-pipeline
+
+  - name: telemetry absent fires when no target exports ehlo series
+    interval: 15s
+    input_series:
+      - series: 'up{job="other", instance="other:9100"}'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: EhloTelemetryAbsent
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: critical
+            exp_annotations:
+              summary: Prometheus cannot scrape the ehlo server
+              description: No metrics from ehlo for over 1 minute, so no other ehlo alert can fire. First check that the ehlo process runs and answers on /metrics, then the scrape target in Prometheus.
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlotelemetryabsent
+              dashboard_uid: ehlo-pipeline
+
+  - name: telemetry absent follows ehlo_build_info, not the job name
+    interval: 15s
+    input_series:
+      - series: 'up{job="mail-ehlo", instance="203.0.113.10:8080"}'
+        values: '1x20'
+      - series: 'ehlo_build_info{job="mail-ehlo", instance="203.0.113.10:8080", version="v1.0.0"}'
+        values: '1x20'
+      - series: 'up{job="mail-ehlo", instance="203.0.113.11:8080"}'
+        values: '1x4 0x16'
+      - series: 'ehlo_build_info{job="mail-ehlo", instance="203.0.113.11:8080", version="v1.0.0"}'
+        values: '1x4 stale'
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: EhloTelemetryAbsent
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: EhloTelemetryAbsent
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: critical
+              job: mail-ehlo
+              instance: 203.0.113.11:8080
+            exp_annotations:
+              summary: Prometheus cannot scrape the ehlo server
+              description: No metrics from ehlo for over 1 minute, so no other ehlo alert can fire. First check that the ehlo process runs and answers on /metrics, then the scrape target in Prometheus.
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlotelemetryabsent
+              dashboard_uid: ehlo-pipeline
+
+  - name: invalid events above one percent
+    interval: 15s
+    input_series:
+      - series: 'ehlo_events_total{type="reply", result="accepted"}'
+        values: '0+100x80'
+      - series: 'ehlo_events_total{type="reply", result="invalid"}'
+        values: '0+5x80'
+      - series: 'ehlo_events_total{type="bounce", result="accepted"}'
+        values: '0+100x80'
+      - series: 'ehlo_events_total{type="bounce", result="invalid"}'
+        values: '0x80'
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: EhloIngestInvalidEvents
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: warning
+              type: reply
+            exp_annotations:
+              summary: 4.762% of reply events fail validation
+              description: "ehlo drops these events, so the dashboards undercount. First read the errors in the POST /v1/events response of the adapter that sends reply events."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloingestinvalidevents
+              dashboard_uid: ehlo-pipeline
+
+  - name: a few invalid events among few events do not alert
+    interval: 15s
+    input_series:
+      - series: 'ehlo_events_total{type="queue", result="accepted"}'
+        values: '0+1x80'
+      - series: 'ehlo_events_total{type="queue", result="invalid"}'
+        values: '0x40 1x40'
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: EhloIngestInvalidEvents
+        exp_alerts: []
+
+  - name: one lane at its limit, the provider still has room
+    interval: 15s
+    input_series:
+      - series: 'ehlo_warmup_sent_today_messages{source="mx-1", provider="gmail"}'
+        values: '99000x10'
+      - series: 'ehlo_warmup_daily_limit_messages{source="mx-1", provider="gmail"}'
+        values: '99000x10'
+      - series: 'ehlo_warmup_sent_today_messages{source="mx-2", provider="gmail"}'
+        values: '50000x10'
+      - series: 'ehlo_warmup_daily_limit_messages{source="mx-2", provider="gmail"}'
+        values: '99000x10'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: EhloLaneAtDailyLimit
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: info
+              source: mx-1
+              provider: gmail
+            exp_annotations:
+              summary: mx-1 reached its daily limit toward gmail
+              description: "Expected during warmup. Send the rest of today's mail to gmail through another server."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlolaneatdailylimit
+              dashboard_uid: ehlo-warmup
+      - eval_time: 3m
+        alertname: EhloProviderCapacityExhausted
+        exp_alerts: []
+
+  - name: every lane toward a provider above 90 percent
+    interval: 15s
+    input_series:
+      - series: 'ehlo_warmup_sent_today_messages{source="mx-1", provider="yahoo"}'
+        values: '19000x20'
+      - series: 'ehlo_warmup_daily_limit_messages{source="mx-1", provider="yahoo"}'
+        values: '20000x20'
+      - series: 'ehlo_warmup_sent_today_messages{source="mx-2", provider="yahoo"}'
+        values: '20000x20'
+      - series: 'ehlo_warmup_daily_limit_messages{source="mx-2", provider="yahoo"}'
+        values: '20000x20'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: EhloProviderCapacityExhausted
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: EhloProviderCapacityExhausted
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: critical
+              provider: yahoo
+            exp_annotations:
+              summary: No server has room left today for mail to yahoo
+              description: "Every server toward yahoo is above 90% of its daily limit, paused or blocked. First send the overflow to yahoo through an ESP."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloprovidercapacityexhausted
+              dashboard_uid: ehlo-warmup
+
+  - name: a paused lane has no capacity left and does not count as at its limit
+    interval: 15s
+    input_series:
+      - series: 'ehlo_warmup_sent_today_messages{source="mx-1", provider="outlook"}'
+        values: '30000x20'
+      - series: 'ehlo_warmup_daily_limit_messages{source="mx-1", provider="outlook"}'
+        values: '30000x20'
+      - series: 'ehlo_warmup_sent_today_messages{source="mx-2", provider="outlook"}'
+        values: '0x20'
+      - series: 'ehlo_warmup_daily_limit_messages{source="mx-2", provider="outlook"}'
+        values: '0x20'
+      - series: 'ehlo_warmup_state{source="mx-1", provider="outlook", state="paused"}'
+        values: '0x20'
+      - series: 'ehlo_warmup_state{source="mx-2", provider="outlook", state="paused"}'
+        values: '1x20'
+    promql_expr_test:
+      - expr: ehlo:lane_quota_used:ratio
+        eval_time: 1m
+        exp_samples:
+          - labels: 'ehlo:lane_quota_used:ratio{source="mx-1", provider="outlook"}'
+            value: 1
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: EhloProviderCapacityExhausted
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: critical
+              provider: outlook
+            exp_annotations:
+              summary: No server has room left today for mail to outlook
+              description: "Every server toward outlook is above 90% of its daily limit, paused or blocked. First send the overflow to outlook through an ESP."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloprovidercapacityexhausted
+              dashboard_uid: ehlo-warmup
+      - eval_time: 3m
+        alertname: EhloLaneAtDailyLimit
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: info
+              source: mx-1
+              provider: outlook
+            exp_annotations:
+              summary: mx-1 reached its daily limit toward outlook
+              description: "Expected during warmup. Send the rest of today's mail to outlook through another server."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlolaneatdailylimit
+              dashboard_uid: ehlo-warmup
+      - eval_time: 3m
+        alertname: EhloWarmupLanePaused
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: info
+              source: mx-2
+              provider: outlook
+              state: paused
+            exp_annotations:
+              summary: Warmup paused mx-2 toward outlook for spam complaints
+              description: "The lane sends nothing until it resumes at half its last good limit. Send mail to outlook through another server meanwhile."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlowarmuplanepaused
+              dashboard_uid: ehlo-warmup
+
+  - name: unsigned mail on one source
+    interval: 15s
+    input_series:
+      - series: 'ehlo_dkim_messages_total{route="self_hosted", source="mx-3", result="unsigned"}'
+        values: '0+10x80'
+      - series: 'ehlo_dkim_messages_total{route="self_hosted", source="mx-3", result="signed"}'
+        values: '0+90x80'
+      - series: 'ehlo_dkim_messages_total{route="self_hosted", source="mx-1", result="signed"}'
+        values: '0+100x80'
+      - series: 'ehlo_dkim_messages_total{route="self_hosted", source="mx-1", result="unsigned"}'
+        values: '0x80'
+    promql_expr_test:
+      - expr: ehlo:dkim_unsigned:ratio_rate10m
+        eval_time: 12m
+        exp_samples:
+          - labels: 'ehlo:dkim_unsigned:ratio_rate10m{source="mx-1"}'
+            value: 0
+          - labels: 'ehlo:dkim_unsigned:ratio_rate10m{source="mx-3"}'
+            value: 0.1
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: EhloDKIMUnsigned
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: EhloDKIMUnsigned
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: critical
+              source: mx-3
+            exp_annotations:
+              summary: mx-3 sends mail without a DKIM signature (10%)
+              description: "Providers may reject or spam-folder this mail. First route mail away from mx-3, then restart its DKIM signer."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlodkimunsigned
+              dashboard_uid: ehlo-reputation
+
+  - name: rate limiting above 5 percent of attempts, kept through the backoff
+    interval: 15s
+    input_series:
+      - series: 'ehlo_reply_categories_total{route="self_hosted", source="mx-4", provider="gmail", category="rate_limited"}'
+        values: '0+30x80 2400x80'
+      - series: 'ehlo_reply_categories_total{route="self_hosted", source="mx-4", provider="gmail", category="delivered"}'
+        values: '0+70x80 5600x80'
+      - series: 'ehlo_smtp_attempts_total{route="self_hosted", source="mx-4", provider="gmail", attempt="first"}'
+        values: '0+100x80 8000x80'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: EhloProviderRateLimiting
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: warning
+              source: mx-4
+              provider: gmail
+              category: rate_limited
+            exp_annotations:
+              summary: gmail slows down mx-4 (30% of attempts)
+              description: "gmail asks mx-4 to send less. The warmup engine already pauses the lane for 10 minutes. If this repeats, lower the target of mx-4 for gmail."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloproviderratelimiting
+              dashboard_uid: ehlo-delivery
+      - eval_time: 35m
+        alertname: EhloProviderRateLimiting
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: warning
+              source: mx-4
+              provider: gmail
+              category: rate_limited
+            exp_annotations:
+              summary: gmail slows down mx-4 (30% of attempts)
+              description: "gmail asks mx-4 to send less. The warmup engine already pauses the lane for 10 minutes. If this repeats, lower the target of mx-4 for gmail."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloproviderratelimiting
+              dashboard_uid: ehlo-delivery
+      - eval_time: 42m
+        alertname: EhloProviderRateLimiting
+        exp_alerts: []
+
+  - name: a few rate limiting replies on a small lane do not alert
+    interval: 15s
+    input_series:
+      - series: 'ehlo_reply_categories_total{route="self_hosted", source="mx-5", provider="gmail", category="rate_limited"}'
+        values: '0x20 1x20 2x40'
+      - series: 'ehlo_smtp_attempts_total{route="self_hosted", source="mx-5", provider="gmail", attempt="first"}'
+        values: '0+1x80'
+    alert_rule_test:
+      - eval_time: 18m
+        alertname: EhloProviderRateLimiting
+        exp_alerts: []
+
+  - name: authentication rejection pages on the first reply
+    interval: 15s
+    input_series:
+      - series: 'ehlo_reply_categories_total{route="self_hosted", source="mx-1", provider="outlook", category="auth_failure"}'
+        values: '0x4 0+1x40'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: EhloAuthenticationRejected
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: EhloAuthenticationRejected
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: critical
+              source: mx-1
+              provider: outlook
+            exp_annotations:
+              summary: outlook rejects mail from mx-1 for failed SPF, DKIM, DMARC, TLS or reverse DNS
+              description: "15 replies in 10 minutes. First check the DNS records, the DKIM signer and the PTR of the sending IP of mx-1. Do not suppress the recipients."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloauthenticationrejected
+              dashboard_uid: ehlo-reputation
+
+  - name: reputation block above one percent
+    interval: 15s
+    input_series:
+      - series: 'ehlo_reply_categories_total{route="self_hosted", source="mx-2", provider="outlook", category="reputation_block"}'
+        values: '0+5x80'
+      - series: 'ehlo_smtp_attempts_total{route="self_hosted", source="mx-2", provider="outlook", attempt="first"}'
+        values: '0+100x80'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: EhloReputationBlock
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: critical
+              source: mx-2
+              provider: outlook
+              category: reputation_block
+            exp_annotations:
+              summary: outlook blocks mx-2 for reputation (5% of attempts)
+              description: "The warmup engine stops the lane until the next day. First request delisting from outlook with the URL or code in the reply text. Do not retry 5xx replies."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloreputationblock
+              dashboard_uid: ehlo-reputation
+
+  - name: two block replies on a small lane do not page
+    interval: 15s
+    input_series:
+      - series: 'ehlo_reply_categories_total{route="self_hosted", source="mx-6", provider="outlook", category="reputation_block"}'
+        values: '0x20 2x60'
+      - series: 'ehlo_smtp_attempts_total{route="self_hosted", source="mx-6", provider="outlook", attempt="first"}'
+        values: '0+2x80'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: EhloReputationBlock
+        exp_alerts: []
+
+  - name: hard bounces above 2.5 percent
+    interval: 15s
+    input_series:
+      - series: 'ehlo_bounces_total{route="self_hosted", source="mx-1", provider="gmail", kind="hard"}'
+        values: '0+4x80'
+      - series: 'ehlo_smtp_attempts_total{route="self_hosted", source="mx-1", provider="gmail", attempt="first"}'
+        values: '0+100x80'
+      - series: 'ehlo_bounces_total{route="self_hosted", source="mx-7", provider="gmail", kind="hard"}'
+        values: '0x20 1x20 2x40'
+      - series: 'ehlo_smtp_attempts_total{route="self_hosted", source="mx-7", provider="gmail", attempt="first"}'
+        values: '0+1x80'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: EhloHardBounceRateHigh
+        exp_alerts: []
+      - eval_time: 22m
+        alertname: EhloHardBounceRateHigh
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: warning
+              route: self_hosted
+              source: mx-1
+              provider: gmail
+            exp_annotations:
+              summary: "4% of mail from mx-1 to gmail goes to addresses that do not exist"
+              description: "A list with many invalid addresses hurts reputation. First find the campaign and suppress each address on its first hard bounce."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlohardbounceratehigh
+              dashboard_uid: ehlo-reputation
+
+  - name: a feedback feed that goes quiet while sending continues
+    interval: 1m
+    input_series:
+      - series: 'ehlo_route_last_event_timestamp_seconds{route="ses", type="complaint"}'
+        values: '0x60'
+      - series: 'ehlo_smtp_attempts_total{route="ses", source="ses", provider="gmail", attempt="first"}'
+        values: '0+100x60'
+      - series: 'ehlo_route_last_event_timestamp_seconds{route="sendgrid", type="bounce"}'
+        values: '0x60'
+      - series: 'ehlo_delivered_total{route="sendgrid", source="sendgrid", provider="yahoo"}'
+        values: '0+100x60'
+      - series: 'ehlo_route_last_event_timestamp_seconds{route="self_hosted", type="complaint"}'
+        values: '0+60x60'
+      - series: 'ehlo_smtp_attempts_total{route="self_hosted", source="mx-1", provider="gmail", attempt="first"}'
+        values: '0+100x60'
+      - series: 'ehlo_route_last_event_timestamp_seconds{route="quiet", type="bounce"}'
+        values: '0x60'
+      - series: 'ehlo_smtp_attempts_total{route="quiet", source="quiet", provider="gmail", attempt="first"}'
+        values: '0x60'
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: EhloFeedbackFeedStale
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: warning
+              route: ses
+              type: complaint
+            exp_annotations:
+              summary: No complaint event on route ses for 40m 0s while it keeps sending
+              description: "A webhook or feedback loop probably stopped. Until it is fixed, the complaint rate reads zero and the warmup engine counts the day as clean. First check the adapter that sends complaint events for route ses."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlofeedbackfeedstale
+              dashboard_uid: ehlo-pipeline
+          - exp_labels:
+              component: ehlo
+              severity: warning
+              route: sendgrid
+              type: bounce
+            exp_annotations:
+              summary: No bounce event on route sendgrid for 40m 0s while it keeps sending
+              description: "A webhook or feedback loop probably stopped. Until it is fixed, the bounce rate reads zero and the warmup engine counts the day as clean. First check the adapter that sends bounce events for route sendgrid."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlofeedbackfeedstale
+              dashboard_uid: ehlo-pipeline
+
+  - name: connection failures above half of the attempts
+    interval: 15s
+    input_series:
+      - series: 'ehlo_smtp_connect_failures_total{route="self_hosted", source="mx-2", provider="outlook"}'
+        values: '0+60x80'
+      - series: 'ehlo_smtp_attempts_total{route="self_hosted", source="mx-2", provider="outlook", attempt="first"}'
+        values: '0+100x80'
+      - series: 'ehlo_smtp_connect_failures_total{route="self_hosted", source="mx-2", provider="gmail"}'
+        values: '0+1x80'
+      - series: 'ehlo_smtp_attempts_total{route="self_hosted", source="mx-2", provider="gmail", attempt="first"}'
+        values: '0+100x80'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: EhloConnectionFailures
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: warning
+              source: mx-2
+              provider: outlook
+            exp_annotations:
+              summary: mx-2 cannot connect to outlook (60% of attempts)
+              description: "Sessions end before any mail is sent. First check whether other servers fail toward outlook too: if they do, the provider or the network is the cause; if not, check the IP, PTR and TLS of mx-2."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloconnectionfailures
+              dashboard_uid: ehlo-delivery
+
+  - name: deferred queue above 5 percent of a day and 1000 messages
+    interval: 1m
+    input_series:
+      - series: 'ehlo_queue_deferred_messages{source="mx-1"}'
+        values: '5000x40'
+      - series: 'ehlo_smtp_attempts_total{route="self_hosted", source="mx-1", provider="gmail", attempt="first"}'
+        values: '0+100x40'
+      - series: 'ehlo_queue_deferred_messages{source="mx-2"}'
+        values: '500x40'
+      - series: 'ehlo_smtp_attempts_total{route="self_hosted", source="mx-2", provider="gmail", attempt="first"}'
+        values: '0+1x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: EhloDeferredQueueGrowing
+        exp_alerts: []
+      - eval_time: 30m
+        alertname: EhloDeferredQueueGrowing
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: warning
+              source: mx-1
+            exp_annotations:
+              summary: "mx-1 has mail waiting to retry, 166.7% of a day's volume"
+              description: "A provider defers or refuses mail from mx-1. First open Retry-later codes on the Delivery dashboard to see which replies."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlodeferredqueuegrowing
+              dashboard_uid: ehlo-delivery
+
+  - name: two replicas reporting the same queue give one alert
+    interval: 1m
+    input_series:
+      - series: 'ehlo_queue_deferred_messages{source="mx-1", instance="a"}'
+        values: '5000x40'
+      - series: 'ehlo_queue_deferred_messages{source="mx-1", instance="b"}'
+        values: '4000x40'
+      - series: 'ehlo_smtp_attempts_total{route="self_hosted", source="mx-1", provider="gmail", attempt="first", instance="a"}'
+        values: '0+50x40'
+      - series: 'ehlo_smtp_attempts_total{route="self_hosted", source="mx-1", provider="gmail", attempt="first", instance="b"}'
+        values: '0+50x40'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: EhloDeferredQueueGrowing
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: warning
+              source: mx-1
+            exp_annotations:
+              summary: "mx-1 has mail waiting to retry, 166.7% of a day's volume"
+              description: "A provider defers or refuses mail from mx-1. First open Retry-later codes on the Delivery dashboard to see which replies."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlodeferredqueuegrowing
+              dashboard_uid: ehlo-delivery
+
+  - name: two replicas reporting the same lanes give one series per lane
+    interval: 15s
+    input_series:
+      - series: 'ehlo_warmup_sent_today_messages{source="mx-1", provider="gmail", instance="a"}'
+        values: '1000x10'
+      - series: 'ehlo_warmup_sent_today_messages{source="mx-1", provider="gmail", instance="b"}'
+        values: '900x10'
+      - series: 'ehlo_warmup_daily_limit_messages{source="mx-1", provider="gmail", instance="a"}'
+        values: '1000x10'
+      - series: 'ehlo_warmup_daily_limit_messages{source="mx-1", provider="gmail", instance="b"}'
+        values: '1000x10'
+      - series: 'ehlo_warmup_state{source="mx-1", provider="gmail", state="paused", instance="a"}'
+        values: '1x10'
+      - series: 'ehlo_warmup_state{source="mx-1", provider="gmail", state="paused", instance="b"}'
+        values: '1x10'
+      - series: 'ehlo_route_last_event_timestamp_seconds{route="ses", type="bounce", instance="a"}'
+        values: '0x10'
+      - series: 'ehlo_route_last_event_timestamp_seconds{route="ses", type="bounce", instance="b"}'
+        values: '60x10'
+    promql_expr_test:
+      - expr: ehlo:lane_quota_used:ratio
+        eval_time: 1m
+        exp_samples:
+          - labels: 'ehlo:lane_quota_used:ratio{source="mx-1", provider="gmail"}'
+            value: 1
+      - expr: ehlo:feed_age_seconds
+        eval_time: 2m
+        exp_samples:
+          - labels: 'ehlo:feed_age_seconds{route="ses", type="bounce"}'
+            value: 60
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: EhloWarmupLanePaused
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: info
+              source: mx-1
+              provider: gmail
+              state: paused
+            exp_annotations:
+              summary: Warmup paused mx-1 toward gmail for spam complaints
+              description: "The lane sends nothing until it resumes at half its last good limit. Send mail to gmail through another server meanwhile."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlowarmuplanepaused
+              dashboard_uid: ehlo-warmup
+      - eval_time: 3m
+        alertname: EhloProviderCapacityExhausted
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: critical
+              provider: gmail
+            exp_annotations:
+              summary: No server has room left today for mail to gmail
+              description: "Every server toward gmail is above 90% of its daily limit, paused or blocked. First send the overflow to gmail through an ESP."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloprovidercapacityexhausted
+              dashboard_uid: ehlo-warmup
+
+  - name: complaints over a day with a count floor
+    interval: 1h
+    input_series:
+      - series: 'ehlo_complaints_total{route="self_hosted", source="mx-4", provider="gmail"}'
+        values: '0+1x30'
+      - series: 'ehlo_delivered_total{route="self_hosted", source="mx-4", provider="gmail"}'
+        values: '0+200x30'
+      - series: 'ehlo_complaints_total{route="self_hosted", source="mx-1", provider="gmail"}'
+        values: '0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1'
+      - series: 'ehlo_delivered_total{route="self_hosted", source="mx-1", provider="gmail"}'
+        values: '0+200x30'
+      - series: 'ehlo_complaints_total{route="self_hosted", source="mx-5", provider="gmail"}'
+        values: '0x4 1 2 3 4x25'
+      - series: 'ehlo_delivered_total{route="self_hosted", source="mx-5", provider="gmail"}'
+        values: '0+40x30'
+    promql_expr_test:
+      - expr: |
+          sum by (source) (increase(ehlo_complaints_total{source="mx-5"}[24h]))
+            / sum by (source) (increase(ehlo_delivered_total{source="mx-5"}[24h])) > bool 0.003
+        eval_time: 26h
+        exp_samples:
+          - labels: '{source="mx-5"}'
+            value: 1
+    alert_rule_test:
+      - eval_time: 26h
+        alertname: EhloComplaintRateHigh
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: critical
+              source: mx-4
+              provider: gmail
+            exp_annotations:
+              summary: "Recipients at gmail report 0.5% of mail from mx-4 as spam"
+              description: "Gmail's published guidance, used here for every provider: stay below 0.1% and never reach 0.3%. If every server rises together, the content or the list is the cause: first stop the campaign."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlocomplaintratehigh
+              dashboard_uid: ehlo-reputation
+
+  - name: a blocked lane pages
+    interval: 15s
+    input_series:
+      - series: 'ehlo_warmup_state{source="mx-2", provider="outlook", state="blocked"}'
+        values: '0 0 1 1 1'
+    alert_rule_test:
+      - eval_time: 15s
+        alertname: EhloWarmupLaneBlocked
+        exp_alerts: []
+      - eval_time: 1m
+        alertname: EhloWarmupLaneBlocked
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: critical
+              source: mx-2
+              provider: outlook
+              state: blocked
+            exp_annotations:
+              summary: outlook blocked mx-2, lane stopped until the next day
+              description: "Reputation block replies reached 1% of attempts. First request delisting, as in EhloReputationBlock, and send mail to outlook through another server."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlowarmuplaneblocked
+              dashboard_uid: ehlo-warmup
+
+  - name: a lane that leaves the paused state clears the alert
+    interval: 15s
+    input_series:
+      - series: 'ehlo_warmup_state{source="mx-3", provider="yahoo", state="paused"}'
+        values: '1 1 1 0 0'
+    alert_rule_test:
+      - eval_time: 15s
+        alertname: EhloWarmupLanePaused
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: info
+              source: mx-3
+              provider: yahoo
+              state: paused
+            exp_annotations:
+              summary: Warmup paused mx-3 toward yahoo for spam complaints
+              description: "The lane sends nothing until it resumes at half its last good limit. Send mail to yahoo through another server meanwhile."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlowarmuplanepaused
+              dashboard_uid: ehlo-warmup
+      - eval_time: 1m
+        alertname: EhloWarmupLanePaused
+        exp_alerts: []
+
+  - name: dmarc rows failing both checks
+    interval: 1h
+    input_series:
+      - series: 'ehlo_dmarc_messages_total{source="unknown", spf="fail", dkim="fail"}'
+        values: '0x5 2000x30'
+      - series: 'ehlo_dmarc_messages_total{source="mx-1", spf="pass", dkim="pass"}'
+        values: '0+1000x35'
+    alert_rule_test:
+      - eval_time: 4h
+        alertname: EhloDMARCUnauthenticatedSource
+        exp_alerts: []
+      - eval_time: 8h
+        alertname: EhloDMARCUnauthenticatedSource
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: warning
+              source: unknown
+            exp_annotations:
+              summary: DMARC reports show mail from unknown that fails both SPF and DKIM
+              description: "2k messages in the last day. Either a service sends as your domain without SPF or DKIM set up, or someone spoofs the domain. First identify the sending IPs in the report."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlodmarcunauthenticatedsource
+              dashboard_uid: ehlo-reputation
+
+  - name: a few connection failures on a small lane do not alert
+    interval: 15s
+    input_series:
+      - series: 'ehlo_smtp_connect_failures_total{route="self_hosted", source="mx-8", provider="outlook"}'
+        values: '0x20 1 2 3 4x56'
+      - series: 'ehlo_smtp_attempts_total{route="self_hosted", source="mx-8", provider="outlook", attempt="first"}'
+        values: '0x20 1 2 3 4 5 6x55'
+    promql_expr_test:
+      - expr: ehlo:connect_failure:ratio_rate10m{source="mx-8"} > bool 0.5
+        eval_time: 14m
+        exp_samples:
+          - labels: '{source="mx-8", provider="outlook"}'
+            value: 1
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: EhloConnectionFailures
+        exp_alerts: []
+
+  - name: a blocked lane has no capacity left
+    interval: 15s
+    input_series:
+      - series: 'ehlo_warmup_sent_today_messages{source="mx-1", provider="yahoo"}'
+        values: '1000x20'
+      - series: 'ehlo_warmup_daily_limit_messages{source="mx-1", provider="yahoo"}'
+        values: '20000x20'
+      - series: 'ehlo_warmup_state{source="mx-1", provider="yahoo", state="blocked"}'
+        values: '1x20'
+      - series: 'ehlo_warmup_sent_today_messages{source="mx-2", provider="yahoo"}'
+        values: '19000x20'
+      - series: 'ehlo_warmup_daily_limit_messages{source="mx-2", provider="yahoo"}'
+        values: '20000x20'
+      - series: 'ehlo_warmup_state{source="mx-2", provider="yahoo", state="blocked"}'
+        values: '0x20'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: EhloProviderCapacityExhausted
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: critical
+              provider: yahoo
+            exp_annotations:
+              summary: No server has room left today for mail to yahoo
+              description: "Every server toward yahoo is above 90% of its daily limit, paused or blocked. First send the overflow to yahoo through an ESP."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloprovidercapacityexhausted
+              dashboard_uid: ehlo-warmup
+
+  - name: a queue reporter that stops hands over from the queue alert to the stale feed alert
+    interval: 1m
+    input_series:
+      - series: 'ehlo_queue_deferred_messages{source="mx-1"}'
+        values: '5000x19 stale'
+      - series: 'ehlo_smtp_attempts_total{route="self_hosted", source="mx-1", provider="gmail", attempt="first"}'
+        values: '0+100x60'
+      - series: 'ehlo_queue_deferred_messages{source="mx-2"}'
+        values: '500x19 stale'
+      - series: 'ehlo_smtp_attempts_total{route="self_hosted", source="mx-2", provider="gmail", attempt="first"}'
+        values: '1900x60'
+      - series: 'ehlo_queue_deferred_messages{source="mx-3"}'
+        values: '500x60'
+      - series: 'ehlo_smtp_attempts_total{route="self_hosted", source="mx-3", provider="gmail", attempt="first"}'
+        values: '0+100x60'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: EhloDeferredQueueGrowing
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: warning
+              source: mx-1
+            exp_annotations:
+              summary: "mx-1 has mail waiting to retry, 333.3% of a day's volume"
+              description: "A provider defers or refuses mail from mx-1. First open Retry-later codes on the Delivery dashboard to see which replies."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlodeferredqueuegrowing
+              dashboard_uid: ehlo-delivery
+      - eval_time: 15m
+        alertname: EhloQueueFeedStale
+        exp_alerts: []
+      - eval_time: 30m
+        alertname: EhloDeferredQueueGrowing
+        exp_alerts: []
+      - eval_time: 30m
+        alertname: EhloQueueFeedStale
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: warning
+              source: mx-1
+            exp_annotations:
+              summary: "No queue event from mx-1 for over 15 minutes while it keeps sending"
+              description: "ehlo drops the queue size of mx-1 15 minutes after its last queue event, so EhloDeferredQueueGrowing cannot fire for it. First check the job that posts queue events for mx-1."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloqueuefeedstale
+              dashboard_uid: ehlo-delivery
+
+  - name: short gaps between queue events keep the queue alert firing
+    interval: 1m
+    input_series:
+      - series: 'ehlo_queue_deferred_messages{source="mx-1"}'
+        values: '5000x15 stale 5000x15 stale 5000x15'
+      - series: 'ehlo_smtp_attempts_total{route="self_hosted", source="mx-1", provider="gmail", attempt="first"}'
+        values: '0+100x50'
+    alert_rule_test:
+      - eval_time: 17m
+        alertname: EhloDeferredQueueGrowing
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: warning
+              source: mx-1
+            exp_annotations:
+              summary: "mx-1 has mail waiting to retry, 294.1% of a day's volume"
+              description: "A provider defers or refuses mail from mx-1. First open Retry-later codes on the Delivery dashboard to see which replies."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlodeferredqueuegrowing
+              dashboard_uid: ehlo-delivery
+      - eval_time: 17m
+        alertname: EhloQueueFeedStale
+        exp_alerts: []

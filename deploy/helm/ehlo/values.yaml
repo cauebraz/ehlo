@@ -1,0 +1,193 @@
+# Default values for the ehlo chart. docs/kubernetes.md explains each
+# section.
+
+image:
+  repository: ghcr.io/cauebraz/ehlo
+  # Defaults to the chart appVersion.
+  tag: ""
+  # sha256:... of the image index. Released charts set it to the digest
+  # pushed with the release, so the reference is tag@digest.
+  digest: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# The Deployment always runs one replica with the Recreate strategy. ehlo
+# keeps the warmup state (each lane's limit, sent count and holds) in memory
+# and snapshots it to /data/warmup.json. Two replicas would count sends and
+# grow limits independently and overwrite each other's snapshot, so there
+# is no replicas value. Recreate stops the old pod before the new one
+# mounts the ReadWriteOnce volume.
+
+# ehlo.yaml, rendered into a ConfigMap. Every key is in docs/limits.md.
+# listen and state_path are set by the chart. Do not put webhooks.token or
+# webhooks.sendgrid_public_key here: a ConfigMap is not a secret. Use
+# webhookSecret, or existingConfigSecret for a config that holds them.
+config:
+  sources: []
+  targets:
+    default: 0
+
+# Name of a Secret with the whole ehlo.yaml under existingConfigSecretKey.
+# When set, the chart renders no ConfigMap and ignores config. Use it to
+# keep webhooks.token and webhooks.sendgrid_public_key out of Helm values,
+# for example with an External Secrets template. It cannot be combined with
+# webhookSecret: put the webhook credentials in this Secret instead.
+existingConfigSecret: ""
+existingConfigSecretKey: ehlo.yaml
+
+# An existing Secret with the webhook credentials. The chart mounts it and
+# sets webhooks.token_file and webhooks.sendgrid_public_key_file, so the
+# values stay out of the ConfigMap. Leave a key empty to skip it. ehlo reads
+# the files at start: after rotating the Secret, run kubectl rollout restart.
+# Rendering fails when existingConfigSecret is also set.
+webhookSecret:
+  name: ""
+  tokenKey: token
+  sendgridPublicKeyKey: ""
+
+# Extra arguments after serve -config ... -state ...
+extraArgs: []
+
+persistence:
+  # false mounts an emptyDir: the warmup state is lost on every restart.
+  enabled: true
+  # Name of an existing PVC. The chart creates one when empty.
+  existingClaim: ""
+  storageClassName: ""
+  accessModes: [ReadWriteOnce]
+  size: 1Gi
+  annotations: {}
+
+service:
+  type: ClusterIP
+  port: 8080
+  annotations: {}
+  labels: {}
+
+podAnnotations: {}
+podLabels: {}
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  # ehlo calls no Kubernetes API.
+  automountServiceAccountToken: false
+
+# The image is distroless/static:nonroot (UID and GID 65532).
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  privileged: false
+  capabilities:
+    drop: [ALL]
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# ehlo snapshots the state on SIGTERM; it stops within 10 seconds.
+terminationGracePeriodSeconds: 20
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+priorityClassName: ""
+
+extraEnv: []
+extraVolumes: []
+extraVolumeMounts: []
+
+# Scrape config for the Prometheus Operator. Enable one of the two.
+# kube-prometheus-stack selects monitors labeled release: <its release name>
+# unless its serviceMonitorSelectorNilUsesHelmValues is false.
+serviceMonitor:
+  enabled: false
+  labels: {}
+  annotations: {}
+  interval: 15s
+  scrapeTimeout: 10s
+  # Sets the job label. Empty keeps the Prometheus Operator default, the
+  # Service name.
+  job: ""
+  relabelings: []
+  metricRelabelings: []
+
+podMonitor:
+  enabled: false
+  labels: {}
+  annotations: {}
+  interval: 15s
+  scrapeTimeout: 10s
+  # Sets the job label. Empty keeps the Prometheus Operator default,
+  # <namespace>/<PodMonitor name>.
+  job: ""
+  relabelings: []
+  metricRelabelings: []
+
+# Recording and alerting rules from files/rules, rendered by
+# ehlo-monitoring with the default config (no extra selector, rule label
+# component="ehlo"). For other selectors, render your own with
+# ehlo-monitoring and leave this off.
+prometheusRule:
+  enabled: false
+  labels: {}
+  annotations: {}
+
+# The dashboards in files/dashboards (Grafana dashboard schema v2, Grafana
+# 13 or later), one ConfigMap each, for the Grafana sidecar.
+dashboards:
+  enabled: false
+  # The sidecar's label and value (kube-prometheus-stack:
+  # grafana.sidecar.dashboards.label and labelValue).
+  label: grafana_dashboard
+  labelValue: "1"
+  # Namespace for the ConfigMaps. Defaults to the release namespace.
+  namespace: ""
+  labels: {}
+  # For example grafana_folder: ehlo, with the sidecar's folderAnnotation.
+  annotations: {}
+
+# The same dashboards as GrafanaManifest objects for the Grafana Operator
+# (v5.25 or later: v5.22 added GrafanaManifest, v5.25.0 fixed its updates).
+grafanaManifests:
+  enabled: false
+  labels: {}
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  # Folder UID, set as the grafana.app/folder annotation.
+  folderUID: ""
+  allowCrossNamespaceImport: false
+  resyncPeriod: ""

@@ -1,0 +1,25 @@
+{{- $cfg := .Values.dashboards }}
+{{- if $cfg.enabled }}
+{{- range $path, $_ := $.Files.Glob "files/dashboards/*.json" }}
+{{- $uid := base $path | trimSuffix ".json" }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-%s-dashboard" (include "ehlo.fullname" $) (trimPrefix "ehlo-" $uid) | trunc 63 | trimSuffix "-" }}
+  namespace: {{ default $.Release.Namespace $cfg.namespace }}
+  labels:
+    {{- include "ehlo.labels" $ | nindent 4 }}
+    {{ $cfg.label }}: {{ $cfg.labelValue | quote }}
+    {{- with $cfg.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with $cfg.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+data:
+  {{ base $path }}: |
+    {{- $.Files.Get $path | nindent 4 }}
+{{- end }}
+{{- end }}

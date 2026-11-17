@@ -1,0 +1,18 @@
+# Every optional object on, as with kube-prometheus-stack.
+config:
+  sources: [mx-1, mx-2]
+  targets:
+    default: 100000
+serviceMonitor:
+  enabled: true
+  job: ehlo
+  labels:
+    release: kube-prometheus-stack
+prometheusRule:
+  enabled: true
+  labels:
+    release: kube-prometheus-stack
+dashboards:
+  enabled: true
+  annotations:
+    grafana_folder: ehlo

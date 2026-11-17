@@ -1,0 +1,9 @@
+{"time":"2026-03-10T08:15:02Z","queued_at":"2026-03-10T08:15:01.5Z","status":"sent","rcpt":"user1@gmail.com","pool":"pool-a","ip":"203.0.113.10","attempt":1,"code":250,"enhanced":"2.0.0","response":"250 2.0.0 OK"}
+{"time":"2026-03-10T08:15:03Z","status":"deferred","rcpt":"user2@yahoo.com","pool":"pool-a","attempt":1,"code":421,"enhanced":"4.7.0","response":"421 4.7.0 [TSS04] Messages from 203.0.113.10 temporarily deferred"}
+{"time":"2026-03-10T08:30:03Z","status":"sent","rcpt":"user2@yahoo.com","pool":"pool-a","attempt":2,"code":250,"response":"250 ok"}
+{"time":"2026-03-10T08:15:04Z","status":"bounced","rcpt":"user3@outlook.com","pool":"pool-b","attempt":1,"code":550,"enhanced":"5.7.1","response":"550 5.7.1 Service unavailable, Client host blocked"}
+{"time":"2026-03-10T08:15:05Z","status":"deferred","rcpt":"user4@outlook.com","pool":"pool-b","attempt":1,"response":"connect to 203.0.113.28:25: connection refused"}
+{"time":"2026-03-12T08:15:05Z","status":"expired","rcpt":"user4@outlook.com","pool":"pool-b"}
+{"time":"2026-03-10T09:00:00Z","status":"complaint","rcpt":"user1@gmail.com","pool":"pool-a"}
+{"time":"2026-03-10T09:00:00Z","status":"queued","rcpt":"user9@gmail.com","pool":"pool-a"}
+not json

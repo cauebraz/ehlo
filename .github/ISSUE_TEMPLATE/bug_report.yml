@@ -1,0 +1,41 @@
+name: Bug report
+description: Something behaves differently from what the docs say.
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `ehlo version`, or the commit.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: How ehlo runs (binary, image, compose demo), the event source (Postfix, SES, SendGrid, API), and the Prometheus and Grafana versions if a rule or dashboard is involved.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The observed behavior, with the event, metric, panel or API response involved.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: Events posted, config used, `just scenario` if the simulator reproduces it.
+      render: shell
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or Postfix lines
+      description: Redact recipients, domains you own and real IPs. Use 203.0.113.0/24 for example IPs.
+      render: text

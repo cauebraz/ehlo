@@ -1,0 +1,27 @@
+{{- with .Values.prometheusRule }}
+{{- if .enabled }}
+{{- $groups := list }}
+{{- range $file := list "ehlo-recording.yml" "ehlo-alerts.yml" }}
+{{- $groups = concat $groups (default list (get ($.Files.Get (printf "files/rules/%s" $file) | fromYaml) "groups")) }}
+{{- end }}
+{{- if not $groups }}
+{{- fail "files/rules has no rule groups; run just dashboard" }}
+{{- end }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "ehlo.fullname" $ }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "ehlo.labels" $ | nindent 4 }}
+    {{- with .labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- toYaml (dict "groups" $groups) | nindent 2 }}
+{{- end }}
+{{- end }}

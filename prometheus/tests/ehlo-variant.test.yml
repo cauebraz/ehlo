@@ -1,0 +1,142 @@
+rule_files:
+  - rules/ehlo-recording.yml
+  - rules/ehlo-alerts.yml
+
+evaluation_interval: 15s
+
+tests:
+  - name: a failing target and a vanished cluster each alert once, with the cluster
+    interval: 15s
+    input_series:
+      - series: 'up{cluster="eu", job="mail-ehlo", instance="a"}'
+        values: '1x20'
+      - series: 'ehlo_build_info{cluster="eu", job="mail-ehlo", instance="a", version="v1.0.0"}'
+        values: '1x20'
+      - series: 'up{cluster="us", job="mail-ehlo", instance="c"}'
+        values: '1x4 0x16'
+      - series: 'ehlo_build_info{cluster="us", job="mail-ehlo", instance="c", version="v1.0.0"}'
+        values: '1x4 stale'
+      - series: 'up{cluster="ap", job="mail-ehlo", instance="d"}'
+        values: '1x4 stale'
+      - series: 'ehlo_build_info{cluster="ap", job="mail-ehlo", instance="d", version="v1.0.0"}'
+        values: '1x4 stale'
+      - series: 'up{cluster="eu", job="ehlo-staging", instance="s"}'
+        values: '1x4 0x16'
+      - series: 'ehlo_build_info{cluster="eu", job="ehlo-staging", instance="s", version="v1.0.0"}'
+        values: '1x4 stale'
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: EhloTelemetryAbsent
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: EhloTelemetryAbsent
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: critical
+              cluster: us
+              job: mail-ehlo
+              instance: c
+            exp_annotations:
+              summary: Prometheus cannot scrape the ehlo server
+              description: No metrics from ehlo for over 1 minute, so no other ehlo alert can fire. First check that the ehlo process runs and answers on /metrics, then the scrape target in Prometheus.
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlotelemetryabsent
+              dashboard_uid: ehlo-pipeline
+          - exp_labels:
+              component: ehlo
+              severity: critical
+              cluster: ap
+              job: mail-ehlo
+            exp_annotations:
+              summary: Prometheus cannot scrape the ehlo server
+              description: No metrics from ehlo for over 1 minute, so no other ehlo alert can fire. First check that the ehlo process runs and answers on /metrics, then the scrape target in Prometheus.
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlotelemetryabsent
+              dashboard_uid: ehlo-pipeline
+
+  - name: two replicas per cluster, one queue alert per cluster and source
+    interval: 1m
+    input_series:
+      - series: 'ehlo_queue_deferred_messages{cluster="eu", job="mail-ehlo", instance="a", source="mx-1"}'
+        values: '5000x40'
+      - series: 'ehlo_queue_deferred_messages{cluster="eu", job="mail-ehlo", instance="b", source="mx-1"}'
+        values: '4000x40'
+      - series: 'ehlo_smtp_attempts_total{cluster="eu", job="mail-ehlo", instance="a", route="self_hosted", source="mx-1", provider="gmail", attempt="first"}'
+        values: '0+50x40'
+      - series: 'ehlo_smtp_attempts_total{cluster="eu", job="mail-ehlo", instance="b", route="self_hosted", source="mx-1", provider="gmail", attempt="first"}'
+        values: '0+50x40'
+      - series: 'ehlo_queue_deferred_messages{cluster="us", job="mail-ehlo", instance="c", source="mx-1"}'
+        values: '10x40'
+      - series: 'ehlo_smtp_attempts_total{cluster="us", job="mail-ehlo", instance="c", route="self_hosted", source="mx-1", provider="gmail", attempt="first"}'
+        values: '0+100x40'
+      - series: 'ehlo_queue_deferred_messages{cluster="us", job="other", instance="o", source="mx-1"}'
+        values: '90000x40'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: EhloDeferredQueueGrowing
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: warning
+              cluster: eu
+              job: mail-ehlo
+              source: mx-1
+            exp_annotations:
+              summary: "mx-1 has mail waiting to retry, 166.7% of a day's volume"
+              description: "A provider defers or refuses mail from mx-1. First open Retry-later codes on the Delivery dashboard to see which replies."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlodeferredqueuegrowing
+              dashboard_uid: ehlo-delivery
+
+  - name: recording rules keep the cluster and the selector's job, and drop instance
+    interval: 15s
+    input_series:
+      - series: 'ehlo_delivered_total{cluster="eu", job="mail-ehlo", instance="a", route="self_hosted", source="mx-1", provider="gmail"}'
+        values: '0+90x80'
+      - series: 'ehlo_smtp_attempts_total{cluster="eu", job="mail-ehlo", instance="a", route="self_hosted", source="mx-1", provider="gmail", attempt="first"}'
+        values: '0+100x80'
+      - series: 'ehlo_delivered_total{cluster="eu", job="mail-ehlo", instance="b", route="self_hosted", source="mx-1", provider="gmail"}'
+        values: '0+100x80'
+      - series: 'ehlo_smtp_attempts_total{cluster="eu", job="mail-ehlo", instance="b", route="self_hosted", source="mx-1", provider="gmail", attempt="first"}'
+        values: '0+100x80'
+      - series: 'ehlo_delivered_total{cluster="us", job="mail-ehlo", instance="c", route="self_hosted", source="mx-1", provider="gmail"}'
+        values: '0+50x80'
+      - series: 'ehlo_smtp_attempts_total{cluster="us", job="mail-ehlo", instance="c", route="self_hosted", source="mx-1", provider="gmail", attempt="first"}'
+        values: '0+100x80'
+      - series: 'ehlo_delivered_total{cluster="us", job="other", instance="o", route="self_hosted", source="mx-1", provider="gmail"}'
+        values: '0x80'
+      - series: 'ehlo_smtp_attempts_total{cluster="us", job="other", instance="o", route="self_hosted", source="mx-1", provider="gmail", attempt="first"}'
+        values: '0+1000x80'
+    promql_expr_test:
+      - expr: ehlo:delivery:ratio_rate10m
+        eval_time: 12m
+        exp_samples:
+          - labels: 'ehlo:delivery:ratio_rate10m{cluster="eu", job="mail-ehlo", route="self_hosted"}'
+            value: 0.95
+          - labels: 'ehlo:delivery:ratio_rate10m{cluster="us", job="mail-ehlo", route="self_hosted"}'
+            value: 0.5
+
+  - name: a lane paused on two replicas alerts once, with the cluster
+    interval: 15s
+    input_series:
+      - series: 'ehlo_warmup_state{cluster="eu", job="mail-ehlo", instance="a", source="mx-1", provider="gmail", state="paused"}'
+        values: '1x10'
+      - series: 'ehlo_warmup_state{cluster="eu", job="mail-ehlo", instance="b", source="mx-1", provider="gmail", state="paused"}'
+        values: '1x10'
+      - series: 'ehlo_warmup_state{cluster="eu", job="other", instance="o", source="mx-2", provider="gmail", state="paused"}'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: EhloWarmupLanePaused
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: info
+              cluster: eu
+              job: mail-ehlo
+              source: mx-1
+              provider: gmail
+              state: paused
+            exp_annotations:
+              summary: Warmup paused mx-1 toward gmail for spam complaints
+              description: "The lane sends nothing until it resumes at half its last good limit. Send mail to gmail through another server meanwhile."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlowarmuplanepaused
+              dashboard_uid: ehlo-warmup

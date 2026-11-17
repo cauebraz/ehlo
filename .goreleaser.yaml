@@ -1,0 +1,93 @@
+version: 2
+
+project_name: ehlo
+
+builds:
+  - id: ehlo
+    main: ./cmd/ehlo
+    binary: ehlo
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w -X main.version={{ .Version }}"]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+  - id: ehlo-sim
+    main: ./cmd/ehlo-sim
+    binary: ehlo-sim
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w"]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+  - id: ehlo-monitoring
+    main: ./cmd/ehlo-monitoring
+    binary: ehlo-monitoring
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w"]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: ehlo
+    ids: [ehlo, ehlo-sim]
+    formats: [tar.gz]
+    builds_info:
+      mtime: "{{ .CommitDate }}"
+    files:
+      - LICENSE
+      - README.md
+      - CHANGELOG.md
+      - SECURITY.md
+      - ehlo.example.yaml
+      - grafana/dashboards/*.json
+      - prometheus/rules/ehlo-recording.yml
+      - prometheus/rules/ehlo-alerts.yml
+      - docs/*.md
+  - id: ehlo-monitoring
+    ids: [ehlo-monitoring]
+    name_template: "ehlo-monitoring_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    builds_info:
+      mtime: "{{ .CommitDate }}"
+    files:
+      - LICENSE
+      - docs/monitoring.md
+
+source:
+  enabled: true
+
+sboms:
+  - artifacts: archive
+  - id: source
+    artifacts: source
+
+checksum:
+  name_template: checksums.txt
+  extra_files:
+    - glob: '{{ envOrDefault "RELEASE_ASSETS" "dist-extra" }}/*'
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude: ["^docs:", "^chore:", "^ci:"]
+
+release:
+  draft: true
+  extra_files:
+    - glob: '{{ envOrDefault "RELEASE_ASSETS" "dist-extra" }}/*'
+  footer: |
+    Verify an archive or the image with the GitHub CLI:
+
+    ```
+    gh attestation verify --owner cauebraz <archive>
+    gh attestation verify --owner cauebraz oci://ghcr.io/cauebraz/ehlo:{{ .Version }}
+    gh attestation verify --owner cauebraz oci://ghcr.io/cauebraz/charts/ehlo:{{ .Version }}
+    ```

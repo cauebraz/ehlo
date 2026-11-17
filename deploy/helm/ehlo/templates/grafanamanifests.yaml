@@ -1,0 +1,37 @@
+{{- $cfg := .Values.grafanaManifests }}
+{{- if $cfg.enabled }}
+{{- range $path, $_ := $.Files.Glob "files/dashboards/*.json" }}
+{{- $dash := $.Files.Get $path | fromJson }}
+{{- $meta := omit (default dict $dash.metadata) "namespace" }}
+{{- with $cfg.folderUID }}
+{{- $_ := set $meta "annotations" (merge (default dict $meta.annotations) (dict "grafana.app/folder" .)) }}
+{{- end }}
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaManifest
+metadata:
+  name: {{ printf "%s-%s" (include "ehlo.fullname" $) (trimPrefix "ehlo-" $dash.metadata.name) | trunc 63 | trimSuffix "-" }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "ehlo.labels" $ | nindent 4 }}
+    {{- with $cfg.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  instanceSelector:
+    {{- toYaml $cfg.instanceSelector | nindent 4 }}
+  {{- if $cfg.allowCrossNamespaceImport }}
+  allowCrossNamespaceImport: true
+  {{- end }}
+  {{- with $cfg.resyncPeriod }}
+  resyncPeriod: {{ . }}
+  {{- end }}
+  template:
+    apiVersion: {{ $dash.apiVersion }}
+    kind: {{ $dash.kind }}
+    metadata:
+      {{- toYaml $meta | nindent 6 }}
+    spec:
+      {{- toYaml $dash.spec | nindent 6 }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,108 @@
+sources:
+  pmta_acct:
+    type: file
+    include:
+      - /var/log/pmta/ehlo-acct*.csv
+    read_from: end
+  pmta_fbl:
+    type: file
+    include:
+      - /var/log/pmta/ehlo-fbl*.csv
+    read_from: end
+
+transforms:
+  pmta_acct_events:
+    type: remap
+    inputs: [pmta_acct]
+    drop_on_abort: true
+    drop_on_error: true
+    source: |
+      line = string!(.message)
+      if starts_with(line, "type,") { abort }
+      c = parse_csv!(line)
+      if length(c) < 10 { abort }
+      kind = string!(c[0])
+      if !includes(["d", "b", "t"], kind) { abort }
+      logged = parse_timestamp(c[1], "%Y-%m-%d %H:%M:%S%z") ?? parse_timestamp(c[1], "%m/%d/%Y %H:%M:%S%z") ?? from_unix_timestamp(to_int(c[1]) ?? 0) ?? now()
+      queued = parse_timestamp(c[2], "%Y-%m-%d %H:%M:%S%z") ?? parse_timestamp(c[2], "%m/%d/%Y %H:%M:%S%z") ?? from_unix_timestamp(to_int(c[2]) ?? 0) ?? logged
+      rcpt = downcase(string!(c[3]))
+      status = string!(c[4])
+      diag = string!(c[5])
+      mta = string!(c[6])
+      category = string!(c[7])
+      src = string!(c[9])
+      if src == "" { src = string!(c[8]) }
+      if src == "" { src = "powermta" }
+      domain = ""
+      parts = split(rcpt, "@")
+      if length(parts) > 1 { domain = string!(parts[-1]) }
+      text = replace(diag, r'^smtp;\s*', "")
+      code_match = parse_regex(text, r'^(?P<code>[245]\d\d)\b') ?? {}
+      code = to_int(code_match.code) ?? 0
+      enh_match = parse_regex(status, r'^(?P<e>[245]\.\d{1,3}\.\d{1,3})') ?? {}
+      enhanced = string(enh_match.e) ?? ""
+      delay = to_float(to_unix_timestamp(logged, unit: "milliseconds") - to_unix_timestamp(queued, unit: "milliseconds")) / 1000.0
+      if delay < 0 { delay = 0.0 }
+      base = {"v": 1, "time": logged, "source": src, "domain": domain}
+      att = merge(base, {"type": "attempt", "attempt": "first"})
+      if delay >= 60 { att.attempt = "retry" }
+      reply = merge(base, {"type": "reply", "text": truncate(text, 128), "delay": delay})
+      if code == 0 {
+        reply.stage = "connect"
+      } else {
+        reply.code = code
+        reply.stage = "rcpt"
+        if enhanced != "" { reply.enhanced = enhanced }
+      }
+      bounce_kind = "hard"
+      if includes(["policy-related", "spam-related", "content-related", "invalid-sender"], category) || starts_with(enhanced, "5.7.") {
+        bounce_kind = "policy"
+      } else if category == "message-expired" || starts_with(enhanced, "4.") || (code >= 400 && code < 500) {
+        bounce_kind = "soft"
+      }
+      bounce = merge(base, {"type": "bounce", "bounce": bounce_kind})
+      if kind == "d" {
+        if code == 0 { reply.code = 250 }
+        reply.stage = "data"
+        if enhanced == "" { reply.enhanced = "2.0.0" }
+        . = [att, reply]
+      } else if kind == "t" {
+        . = [att, reply]
+      } else if category == "message-expired" || (mta == "" && code == 0) {
+        . = [bounce]
+      } else {
+        . = [att, reply, bounce]
+      }
+
+  pmta_fbl_events:
+    type: remap
+    inputs: [pmta_fbl]
+    drop_on_abort: true
+    drop_on_error: true
+    source: |
+      line = string!(.message)
+      if starts_with(line, "type,") { abort }
+      c = parse_csv!(line)
+      if length(c) < 3 || c[0] != "f" || downcase(string!(c[2])) != "abuse" { abort }
+      logged = parse_timestamp(c[1], "%Y-%m-%d %H:%M:%S%z") ?? parse_timestamp(c[1], "%m/%d/%Y %H:%M:%S%z") ?? from_unix_timestamp(to_int(c[1]) ?? 0) ?? now()
+      parts = split(downcase(string(c[3]) ?? ""), "@")
+      domain = ""
+      if length(parts) > 1 { domain = string!(parts[-1]) }
+      . = {"v": 1, "type": "complaint", "time": logged, "source": "powermta", "domain": domain}
+
+sinks:
+  ehlo:
+    type: http
+    inputs: [pmta_acct_events, pmta_fbl_events]
+    uri: http://127.0.0.1:8080/v1/events
+    method: post
+    encoding:
+      codec: json
+    framing:
+      method: newline_delimited
+    request:
+      headers:
+        Content-Type: application/x-ndjson
+    batch:
+      max_events: 1000
+      timeout_secs: 2

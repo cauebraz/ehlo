@@ -1,0 +1,14 @@
+# PodMonitor, GrafanaManifest objects, emptyDir, config from a Secret, image by digest.
+existingConfigSecret: ehlo-config
+image:
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+persistence:
+  enabled: false
+podMonitor:
+  enabled: true
+grafanaManifests:
+  enabled: true
+  folderUID: ehlo
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
