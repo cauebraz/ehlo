@@ -45,7 +45,7 @@ With every day clean and fully used, a lane goes from 50 to 100,000 a day in 19 
 
 ## API
 
-`GET /v1/limits/{source}/{provider}` returns one lane. `GET /v1/limits` returns `{"lanes": [...], "server_time": ...}`, filtered by `?source=` and `?provider=`. The list holds only lanes that exist: a lane appears after its first event, or after its first `GET /v1/limits/{source}/{provider}` when the source is in the config.
+`GET /v1/limits/{source}/{provider}` returns one lane. Times are in UTC. `GET /v1/limits` returns `{"lanes": [...], "server_time": ...}`, filtered by `?source=` and `?provider=`. The list holds only lanes that exist: a lane appears after its first event, or after its first `GET /v1/limits/{source}/{provider}` when the source is in the config.
 
 ```
 {
@@ -64,7 +64,7 @@ With every day clean and fully used, a lane goes from 50 to 100,000 a day in 19 
 ```
 
 - Send up to `allowed_now`, rounded down, then ask again. It is the smaller of the daily and hourly remainders, and 0 while the lane is stopped.
-- While a lane is paused, backed off or blocked, `resume_at` and the `Retry-After` header say when to ask again. When a limit is used up, ask again at `next_hour_at` or `day_end`.
+- While a lane is paused, backed off or blocked, `resume_at` says when to ask again. `GET /v1/limits/{source}/{provider}` also sets the `Retry-After` header; the list endpoint does not. When a limit is used up, ask again at `next_hour_at` or `day_end`.
 - While `engaged_only` is true, send only to recipients who opened or clicked recently.
 - `shaping` is advice for the MTA: parallel connections and messages per connection toward the provider. In Postfix, set `<transport>_destination_concurrency_limit` on a transport per provider.
 - A 404 with `managed: false` means the source has no target, the provider is unknown, or the source has neither a config entry nor a first event.
@@ -163,6 +163,6 @@ Top level:
 | Command | Flags |
 |---------|-------|
 | `ehlo serve` | `-config`, and `-listen`, `-state`, `-day-length` to override the file |
-| `ehlo tail-postfix` | `-source` (required), `-target` (`http://127.0.0.1:8080`), `-file` (`-` for stdin), `-batch` (200, at most 10,000), `-flush` (2s), `-tz` (`Local`), `-retry-after` (1m), `-skip-relay` |
+| `ehlo tail-postfix` | `-source` (required), `-target` (`http://127.0.0.1:8080`), `-file` (`-` for stdin), `-batch` (200, at most 10,000), `-flush` (2s), `-tz` (`Local`), `-retry-after` (1m), `-skip-relay` (comma-separated hosts, each `host`, `host:port` or `[host]:port`) |
 | `ehlo probe <url>` | Exits 0 on HTTP 200. `-timeout` (3s) |
 | `ehlo version` | |

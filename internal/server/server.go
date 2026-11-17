@@ -89,10 +89,12 @@ func WithMaxBody(n int64) Option { return func(s *Server) { s.maxBody = n } }
 // WithClock replaces the wall clock.
 func WithClock(now func() time.Time) Option { return func(s *Server) { s.now = now } }
 
+func utcNow() time.Time { return time.Now().UTC() }
+
 // New wires the handlers to the pipeline that records events, the engine
 // that answers limits and the registry that /metrics exposes.
 func New(p *ingest.Pipeline, e *warmup.Engine, g prometheus.Gatherer, opts ...Option) *Server {
-	s := &Server{pipeline: p, engine: e, gatherer: g, maxBody: DefaultMaxBody, now: time.Now}
+	s := &Server{pipeline: p, engine: e, gatherer: g, maxBody: DefaultMaxBody, now: utcNow}
 	for _, o := range opts {
 		o(s)
 	}

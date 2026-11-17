@@ -50,7 +50,7 @@ Every `POST` endpoint, webhooks included, answers 403 to a cross-origin browser 
 - A delivery is a retry when the same queue ID and recipient appeared before, or when the first field of `delays=` (the time from arrival to the last active queue entry, which includes the deferred queue) is at least `-retry-after` (default 1m). Time spent waiting for a delivery slot in the active queue (the second field) does not count, so a first attempt held back by a concurrency limit stays `first`.
 - `journalctl -o short-iso` lines are read, with the offset written as `+0000` (systemd 252, Debian 12) or `+00:00`.
 - Lines from `lmtp`, `local`, `virtual`, `pipe`, `discard`, `error` and `retry` are skipped. None of them talks to a provider.
-- Lines whose relay is listed in `-skip-relay` are skipped, so a smarthost's 250 is not counted as the provider's.
+- Lines whose relay host is listed in `-skip-relay` are skipped, with the list written as `host`, `host:port` or `[host]:port`, so a smarthost's 250 is not counted as the provider's.
 - A greeting refusal (`refused to talk to me: 554 ...`) keeps the provider's code and counts as a connection failure.
 - A failure Postfix raises before any SMTP session (`relay=none` with no remote reply and no connection error, such as a resolver error or `loops back to myself`) gives no attempt and no reply, because it says nothing about the provider. A `bounced` one still gives the bounce. The next attempt of that message counts as `first` unless it waited at least `-retry-after`.
 - A failed TLS handshake counts once, from the delivery line (`Cannot start TLS: handshake failure`) as a `tls` stage reply toward the recipient's provider. The `SSL_connect error` line before it gives no event.

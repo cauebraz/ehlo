@@ -48,6 +48,8 @@ type laneKey struct{ source, provider string }
 // Option configures an Engine.
 type Option func(*Engine)
 
+func utcNow() time.Time { return time.Now().UTC() }
+
 // WithClock replaces the wall clock. Tests and demos use it.
 func WithClock(now func() time.Time) Option {
 	return func(e *Engine) { e.now = now }
@@ -72,7 +74,7 @@ func New(policy Policy, targets Targets, providers []string, opts ...Option) (*E
 	if err := targets.Validate(); err != nil {
 		return nil, fmt.Errorf("warmup targets: %w", err)
 	}
-	e := &Engine{now: time.Now, policy: policy, targets: targets, providers: set(providers), known: map[string]struct{}{}, lanes: map[laneKey]*Lane{}}
+	e := &Engine{now: utcNow, policy: policy, targets: targets, providers: set(providers), known: map[string]struct{}{}, lanes: map[laneKey]*Lane{}}
 	for _, o := range opts {
 		o(e)
 	}

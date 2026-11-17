@@ -355,3 +355,11 @@ func TestJournalctlShortISO(t *testing.T) {
 		}
 	}
 }
+
+func TestSkipRelayAcceptsRelayhostSyntax(t *testing.T) {
+	p := NewParser("mx-1", WithClock(func() time.Time { return fixed }), WithYear(2026), WithLocation(time.UTC), WithSkipRelays([]string{" [Smarthost.example.org]:587 "}))
+	line := `Mar 10 08:15:02 mx-1 postfix/relay[2231]: 4F3A1B2C3D: to=<user1@gmail.com>, relay=smarthost.example.org[203.0.113.9]:587, delay=0.52, delays=0.01/0/0.21/0.3, dsn=2.0.0, status=sent (250 2.0.0 Ok: queued as 1234)`
+	if got := p.Parse(line); len(got) != 0 {
+		t.Errorf("relay listed as [host]:port produced %+v, want nil", got)
+	}
+}

@@ -75,7 +75,7 @@ Find the campaign, clean the list, and suppress an address on its first hard bou
 
 ## EhloFeedbackFeedStale
 
-Warning. A route keeps sending (attempts or deliveries in the last 30 minutes), but no complaint or bounce event arrived for 30 minutes. A webhook or feedback loop stopped. A route that never received a complaint or bounce event has no last-event time, so this alert cannot fire for it. The last-event time comes from the last day of samples, so the alert survives an ehlo restart and stops a day after the last event. Until it is fixed, the complaint ratio reads zero and the warmup engine counts the day as clean.
+Warning. A route keeps sending (attempts or deliveries in the last 30 minutes), but no complaint or bounce event arrived for 30 minutes. It fires about 35 minutes after the last event: 30 minutes, then 5 minutes of `for`. A webhook or feedback loop stopped. A route that never received a complaint or bounce event has no last-event time, so this alert cannot fire for it. The last-event time comes from the last day of samples, so the alert survives an ehlo restart and stops a day after the last event. Until it is fixed, the complaint ratio reads zero and the warmup engine counts the day as clean.
 
 Fix the feed before the day ends.
 
@@ -95,7 +95,7 @@ ehlo drops a source's queue size 15 minutes after its last `queue` event. Send q
 
 ## EhloQueueFeedStale
 
-Warning. A source reported its queue in the last day, sent attempts in the last 30 minutes, and has had no `queue` event for over 15 minutes. Until the reporter resumes, [EhloDeferredQueueGrowing](#ehlodeferredqueuegrowing) cannot fire for the source. The alert resolves a day after the last queue event.
+Warning. A source reported its queue in the last day, sent attempts in the last 30 minutes, and has had no `queue` event for over 15 minutes. It fires about 20 minutes after the last queue event: ehlo drops the queue size at 15 minutes, then 5 minutes of `for`. Until the reporter resumes, [EhloDeferredQueueGrowing](#ehlodeferredqueuegrowing) cannot fire for the source. The alert resolves a day after the last queue event.
 
 Check the job that posts queue events for the source.
 

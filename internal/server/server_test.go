@@ -248,3 +248,27 @@ func TestWebhooksAndMetrics(t *testing.T) {
 		}
 	}
 }
+
+func TestDefaultClockAnswersInUTC(t *testing.T) {
+	saved := time.Local
+	time.Local = time.FixedZone("UTC-3", -3*60*60)
+	t.Cleanup(func() { time.Local = saved })
+	reg := prometheus.NewRegistry()
+	cls := provider.New(provider.Default)
+	eng, err := warmup.New(warmup.DefaultPolicy(), warmup.Targets{Default: 100_000}, cls.Names(), warmup.WithKnownSources([]string{"mx-1"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := New(ingest.New(cls, metrics.New(reg, "test"), eng), eng, reg)
+	for _, path := range []string{"/v1/limits", "/v1/limits/mx-1/gmail"} {
+		var body struct {
+			ServerTime string `json:"server_time"`
+		}
+		if err := json.Unmarshal(get(t, s.Handler(), path).Body.Bytes(), &body); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.HasSuffix(body.ServerTime, "Z") {
+			t.Errorf("%s server_time = %q, want UTC", path, body.ServerTime)
+		}
+	}
+}

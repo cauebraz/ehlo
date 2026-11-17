@@ -244,16 +244,23 @@ func truncate(s string) string {
 }
 
 func (p *Parser) skipRelay(relay string) bool {
-	host := strings.ToLower(relay)
-	if i := strings.IndexAny(host, "[:"); i >= 0 {
-		host = host[:i]
-	}
+	host := relayHost(relay)
 	for _, s := range p.SkipRelays {
-		if strings.EqualFold(s, host) {
+		if relayHost(s) == host {
 			return true
 		}
 	}
 	return false
+}
+
+// relayHost reduces a log relay (host[ip]:port) or a configured relay
+// ([host]:port, host:port or host) to the lowercase host name.
+func relayHost(s string) string {
+	h := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(s)), "[")
+	if i := strings.IndexAny(h, "[]:"); i >= 0 {
+		h = h[:i]
+	}
+	return h
 }
 
 // containsAny reports whether t contains at least one of needles.

@@ -122,7 +122,7 @@ func tailPostfix(ctx context.Context, args []string) error {
 	flush := fs.Duration("flush", 2*time.Second, "send a partial batch after this long")
 	tz := fs.String("tz", "Local", "time zone of syslog timestamps, an IANA name or Local")
 	retryAfter := fs.Duration("retry-after", time.Minute, "a delivery whose message waited longer than this before its last active queue entry (the first field of delays=) is a retry")
-	skipRelay := fs.String("skip-relay", "", "comma-separated relay hosts whose replies are not a provider's, such as a smarthost")
+	skipRelay := fs.String("skip-relay", "", "comma-separated relay hosts (host, host:port or [host]:port) whose replies are not a provider's, such as a smarthost")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
