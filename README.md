@@ -69,9 +69,7 @@ just reset                     # back to the start
 
 ## Install
 
-- **Linux host:** [Setup](docs/setup.md), then [connect your MTA or ESP](docs/integrations.md).
-- **Kubernetes:** `helm install ehlo oci://ghcr.io/cauebraz/charts/ehlo --version <version>`; [Kubernetes](docs/kubernetes.md) covers kube-prometheus-stack.
-- **Existing Prometheus and Grafana:** [Monitoring](docs/monitoring.md) renders the rules and dashboards for your labels.
+ehlo is one binary with no database. [Setup](docs/setup.md) runs it on one Linux host in six steps: install, configure, run, send events, ask before sending, monitor.
 
 ## Docs
 

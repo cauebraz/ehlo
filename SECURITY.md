@@ -19,7 +19,7 @@ You get a first reply within five days. The fix, the advisory and the CVE reques
 
 ## Verifying releases
 
-Release archives and the GHCR image carry GitHub build provenance attestations, and each archive has an SPDX SBOM. [docs/setup.md](docs/setup.md#install) shows the `gh attestation verify` commands.
+Release archives and the GHCR image carry GitHub build provenance attestations, and each archive has an SPDX SBOM. [docs/setup.md](docs/setup.md#release-files) shows the `gh attestation verify` commands.
 
 ## Deployment
 
