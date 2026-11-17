@@ -146,7 +146,11 @@ func SES(body []byte, now time.Time) ([]event.Event, error) {
 	var out []event.Event
 	switch kind {
 	case "delivery", "send":
-		for _, rcpt := range firstNonEmpty(n.Delivery.Recipients, n.Mail.Destination) {
+		rcpts := firstNonEmpty(n.Delivery.Recipients, n.Mail.Destination)
+		if err := sesBatch(len(rcpts)); err != nil {
+			return nil, err
+		}
+		for _, rcpt := range rcpts {
 			e := base
 			e.Domain = domainOf(rcpt)
 			if kind == "send" {
@@ -164,6 +168,9 @@ func SES(body []byte, now time.Time) ([]event.Event, error) {
 		if strings.EqualFold(n.Bounce.BounceType, "Permanent") {
 			kind = event.Hard
 		}
+		if err := sesBatch(len(n.Bounce.BouncedRecipients)); err != nil {
+			return nil, err
+		}
 		for _, r := range n.Bounce.BouncedRecipients {
 			e := base
 			e.Type, e.Bounce, e.Domain = event.Bounce, kind, domainOf(r.EmailAddress)
@@ -172,6 +179,9 @@ func SES(body []byte, now time.Time) ([]event.Event, error) {
 	case "complaint":
 		if sesSuppressed[n.Complaint.ComplaintSubType] {
 			return nil, nil
+		}
+		if err := sesBatch(len(n.Complaint.ComplainedRecipients)); err != nil {
+			return nil, err
 		}
 		for _, r := range n.Complaint.ComplainedRecipients {
 			e := base
@@ -189,6 +199,13 @@ func SES(body []byte, now time.Time) ([]event.Event, error) {
 		return nil, errors.New("ses: notification without eventType")
 	}
 	return out, nil
+}
+
+func sesBatch(recipients int) error {
+	if recipients > event.MaxBatch {
+		return fmt.Errorf("ses: %d recipients: %w", recipients, event.ErrBatchTooLarge)
+	}
+	return nil
 }
 
 type sendgridEvent struct {

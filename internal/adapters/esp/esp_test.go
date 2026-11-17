@@ -2,6 +2,8 @@ package esp
 
 import (
 	"encoding/json"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -177,5 +179,38 @@ func TestSendGridDeferredKeepsProviderReply(t *testing.T) {
 	}
 	if err := e.Validate(); err != nil {
 		t.Error(err)
+	}
+}
+
+func TestSESRecipientListOverTheEventLimitIsRejected(t *testing.T) {
+	rcpts := func(n int) string {
+		return `"` + strings.Repeat(`user@gmail.com","`, n-1) + `user@gmail.com"`
+	}
+	bounced := func(n int) string {
+		return strings.Repeat(`{"emailAddress":"user@gmail.com"},`, n-1) + `{"emailAddress":"user@gmail.com"}`
+	}
+	cases := map[string]func(n int) string{
+		"delivery": func(n int) string {
+			return `{"eventType":"Delivery","delivery":{"recipients":[` + rcpts(n) + `]},"mail":{}}`
+		},
+		"send": func(n int) string { return `{"eventType":"Send","mail":{"destination":[` + rcpts(n) + `]}}` },
+		"bounce": func(n int) string {
+			return `{"eventType":"Bounce","bounce":{"bounceType":"Permanent","bouncedRecipients":[` + bounced(n) + `]},"mail":{}}`
+		},
+		"complaint": func(n int) string {
+			return `{"eventType":"Complaint","complaint":{"complainedRecipients":[` + bounced(n) + `]},"mail":{}}`
+		},
+	}
+	for name, body := range cases {
+		t.Run(name, func(t *testing.T) {
+			got, err := SES([]byte(body(event.MaxBatch)), now)
+			if err != nil || len(got) != event.MaxBatch {
+				t.Fatalf("%d recipients: %d events, %v, want %d events", event.MaxBatch, len(got), err, event.MaxBatch)
+			}
+			got, err = SES([]byte(body(event.MaxBatch+1)), now)
+			if !errors.Is(err, event.ErrBatchTooLarge) || got != nil {
+				t.Errorf("%d recipients: %d events, %v, want ErrBatchTooLarge", event.MaxBatch+1, len(got), err)
+			}
+		})
 	}
 }

@@ -17,7 +17,7 @@ import (
 	"github.com/cauebraz/ehlo/internal/warmup"
 )
 
-func newServerWithMaxBody(t *testing.T, maxBody int64) (*Server, *prometheus.Registry) {
+func newServerWithDefaultMaxBody(t *testing.T) (*Server, *prometheus.Registry) {
 	t.Helper()
 	clock := func() time.Time { return now }
 	reg := prometheus.NewRegistry()
@@ -27,13 +27,13 @@ func newServerWithMaxBody(t *testing.T, maxBody int64) (*Server, *prometheus.Reg
 		t.Fatal(err)
 	}
 	m := metrics.New(reg, "test", metrics.WithClock(clock))
-	return New(ingest.New(cls, m, eng), eng, reg, WithMaxBody(maxBody), WithClock(clock)), reg
+	return New(ingest.New(cls, m, eng), eng, reg, WithMaxBody(DefaultMaxBody), WithClock(clock)), reg
 }
 
 func TestLargeBatchAllocationIsBounded(t *testing.T) {
 	const size = DefaultMaxBody
 	const limit = 64 << 20
-	s, _ := newServerWithMaxBody(t, size)
+	s, _ := newServerWithDefaultMaxBody(t)
 	h := s.Handler()
 	for name, body := range map[string]string{
 		"ndjson": strings.Repeat("{}\n", size/3),
@@ -58,7 +58,7 @@ func TestLargeBatchAllocationIsBounded(t *testing.T) {
 }
 
 func TestBatchOverTheEventLimitRecordsNothing(t *testing.T) {
-	s, reg := newServerWithMaxBody(t, DefaultMaxBody)
+	s, reg := newServerWithDefaultMaxBody(t)
 	h := s.Handler()
 	one := `{"type":"open","time":"2026-03-10T11:00:00Z","source":"mx-1","domain":"gmail.com"}`
 	for name, body := range map[string]string{
@@ -115,7 +115,7 @@ func TestEmptyBatchIsRejected(t *testing.T) {
 }
 
 func TestSendGridBatchOverTheEventLimitIsRejected(t *testing.T) {
-	s, _ := newServerWithMaxBody(t, DefaultMaxBody)
+	s, _ := newServerWithDefaultMaxBody(t)
 	one := `{"email":"user1@gmail.com","timestamp":1773129601,"event":"delivered"}`
 	body := "[" + strings.Repeat(one+",", event.MaxBatch) + one + "]"
 	req := httptest.NewRequest(http.MethodPost, "/v1/webhooks/sendgrid", strings.NewReader(body))
@@ -136,5 +136,53 @@ func TestSendGridBatchOverTheEventLimitIsRejected(t *testing.T) {
 	runtime.ReadMemStats(&after)
 	if got := after.TotalAlloc - before.TotalAlloc; got > 64<<20 {
 		t.Errorf("allocated %d MiB for a 4 MiB SendGrid body, want at most 64 MiB", got>>20)
+	}
+}
+
+func TestSESRecipientListOverTheEventLimitRecordsNothing(t *testing.T) {
+	s, reg := newServerWithDefaultMaxBody(t)
+	rcpts := `"` + strings.Repeat(`user1@gmail.com","`, event.MaxBatch) + `user1@gmail.com"`
+	body := `{"eventType":"Delivery","delivery":{"recipients":[` + rcpts + `]},"mail":{}}`
+	rec := post(t, s.Handler(), "/v1/webhooks/ses", body)
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("status = %d %s, want 413 for more than %d recipients", rec.Code, rec.Body, event.MaxBatch)
+	}
+	if got := value(t, reg, "ehlo_delivered_total", "provider", "gmail"); got != 0 {
+		t.Errorf("delivered = %v, want 0", got)
+	}
+
+	rcpt := `"a@gmail.com",`
+	big := `{"eventType":"Delivery","delivery":{"recipients":[` + strings.Repeat(rcpt, (DefaultMaxBody-100)/len(rcpt)) + `"a@gmail.com"]},"mail":{}}`
+	var before, after runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&before)
+	rec = post(t, s.Handler(), "/v1/webhooks/ses", big)
+	runtime.ReadMemStats(&after)
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("status = %d for a 4 MiB recipient list, want 413", rec.Code)
+	}
+	if got := after.TotalAlloc - before.TotalAlloc; got > 64<<20 {
+		t.Errorf("allocated %d MiB for a 4 MiB SES body, want at most 64 MiB", got>>20)
+	}
+}
+
+func TestWebhookOverTheEventLimitRecordsNothing(t *testing.T) {
+	s, reg := newServer(t)
+	one := event.Event{Type: event.Open, Time: now, Source: "mx-1", Domain: "gmail.com"}
+	parse := func([]byte, time.Time) ([]event.Event, error) {
+		events := make([]event.Event, event.MaxBatch+1)
+		for i := range events {
+			events[i] = one
+		}
+		return events, nil
+	}
+	pass := func(http.ResponseWriter, *http.Request, []byte) bool { return false }
+	rec := httptest.NewRecorder()
+	s.webhook(parse, pass)(rec, httptest.NewRequest(http.MethodPost, "/v1/webhooks/test", strings.NewReader("{}")))
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("status = %d, want 413 for %d events", rec.Code, event.MaxBatch+1)
+	}
+	if got := value(t, reg, "ehlo_opens_total", "provider", "gmail"); got != 0 {
+		t.Errorf("opens = %v, want 0", got)
 	}
 }
