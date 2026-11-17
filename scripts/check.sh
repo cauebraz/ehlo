@@ -38,7 +38,8 @@ step "promtool test rules"
 docker run --rm -v "$PWD/prometheus:/etc/prometheus:ro" -w /etc/prometheus/tests --entrypoint promtool "$promtool_image" \
     test rules ehlo-alerts.test.yml
 
-variant=$(mktemp -d)
+mkdir -p .tmp
+variant=$(mktemp -d "$PWD/.tmp/check.XXXXXX")
 trap 'rm -rf "$variant"' EXIT
 
 step "promtool test rules rendered with -selector job=\"mail-ehlo\" -group-by cluster, next to a job=\"ehlo-staging\" render"

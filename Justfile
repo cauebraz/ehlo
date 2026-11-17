@@ -13,12 +13,16 @@ setup:
 fmt:
     gofmt -w .
 
-# The lint job CI runs: golangci-lint (needs v2.15.0 installed), govulncheck, actionlint, goreleaser check
+# The lint job CI runs: golangci-lint, govulncheck, actionlint, goreleaser check, at the versions in tools/
 lint:
-    golangci-lint run
-    go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
-    go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
-    go run github.com/goreleaser/goreleaser/v2@v2.20.2 check
+    go tool -modfile=tools/golangci-lint/go.mod golangci-lint run
+    go tool -modfile=tools/govulncheck/go.mod govulncheck ./...
+    go tool -modfile=tools/actionlint/go.mod actionlint
+    go tool -modfile=tools/goreleaser/go.mod goreleaser check
+
+# List the pins Dependabot does not update (syft, kind, kubectl, Helm, e2e charts and images) next to the newest upstream release
+outdated:
+    scripts/outdated.sh
 
 # Build the binaries into bin/
 build:

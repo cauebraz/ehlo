@@ -15,8 +15,6 @@ chart=deploy/helm/ehlo
 helm=$(deploy/scripts/helm.sh path)
 tag=(--set image.tag=ci)
 
-kubeconform_mod=github.com/yannh/kubeconform/cmd/kubeconform@v0.8.0
-yq_mod=github.com/mikefarah/yq/v4@v4.54.3
 kube_versions=(1.30.0 1.37.0)
 k8s_schemas=6ea44f54bb5cdedb2f61fba42c9b342e97959262
 crd_schemas=3e8a8916ca1b7af6464606c2c2f5869dbafa9653
@@ -35,7 +33,7 @@ done
 step "helm template | kubeconform"
 out=$(mktemp -d)
 trap 'rm -rf "$out"' EXIT
-GOBIN="$out" go install "$kubeconform_mod"
+go build -modfile=tools/kubeconform/go.mod -o "$out/kubeconform" github.com/yannh/kubeconform/cmd/kubeconform
 for f in deploy/helm/ci/*.yaml; do
     "$helm" template ehlo "$chart" "${tag[@]}" --namespace ehlo -f "$f" > "$out/$(basename "$f")"
     for v in "${kube_versions[@]}"; do
@@ -51,7 +49,7 @@ step "rules reach the PrometheusRule without template evaluation"
     || { echo "PrometheusRule lost {{ \$labels }}"; exit 1; }
 
 step "chart objects match ehlo-monitoring render"
-GOBIN="$out" go install "$yq_mod"
+go build -modfile=tools/yq/go.mod -o "$out/yq" github.com/mikefarah/yq/v4
 go build -o "$out/ehlo-monitoring" ./cmd/ehlo-monitoring
 normalize='[.] | map(select(.kind == "PrometheusRule" or .kind == "GrafanaManifest" or (.kind == "ConfigMap" and .metadata.labels.grafana_dashboard == "1")))
     | map(del(.metadata.namespace) | .metadata.labels = ((.metadata.labels // {}) | with_entries(select(.key | test("^(app[.]kubernetes[.]io|helm[.]sh)/") | not))))

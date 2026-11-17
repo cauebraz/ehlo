@@ -10,23 +10,49 @@ failures=0
 fail() { printf 'FAIL %s\n' "$1"; failures=$((failures + 1)); }
 query() { curl -fsS "$prom/api/v1/query" --data-urlencode "query=$1" | jq '.data.result | length'; }
 
-curl -fsS "$ehlo/healthz" >/dev/null || fail "ehlo health"
-lanes=$(curl -fsS "$ehlo/v1/limits" | jq '.lanes | length') || fail "limits api"
-(( lanes > 0 )) || fail "limits api lists no lanes"
-printf 'limits api: %s lanes\n' "$lanes"
-curl -fsS "$grafana/api/health" >/dev/null || fail "grafana health"
-for file in grafana/dashboards/*.json; do
-    uid=$(jq -r .metadata.name "$file")
-    title=$(curl -fsS "$grafana/apis/dashboard.grafana.app/v2/namespaces/default/dashboards/$uid" | jq -r '.spec.title') || fail "grafana dashboard $uid"
-    printf 'grafana dashboard: %s\n' "$title"
-done
+summary() {
+    if (( failures > 0 )); then
+        printf '\n%d smoke failures\n' "$failures"
+        exit 1
+    fi
+    printf '\nsmoke passed\n'
+}
 
-up=$(curl -fsS "$prom/api/v1/query" --data-urlencode 'query=min(up and on (job, instance) ehlo_build_info)' | jq -r '.data.result[0].value[1] // "missing"')
+if curl -fsS "$ehlo/healthz" >/dev/null; then
+    if lanes=$(curl -fsS "$ehlo/v1/limits" | jq -e '.lanes | length'); then
+        (( lanes > 0 )) || fail "limits api lists no lanes"
+        printf 'limits api: %s lanes\n' "$lanes"
+    else
+        fail "limits api"
+    fi
+else
+    fail "ehlo health at $ehlo"
+fi
+
+if curl -fsS "$grafana/api/health" >/dev/null; then
+    for file in grafana/dashboards/*.json; do
+        uid=$(jq -r .metadata.name "$file")
+        if title=$(curl -fsS "$grafana/apis/dashboard.grafana.app/v2/namespaces/default/dashboards/$uid" | jq -er '.spec.title'); then
+            printf 'grafana dashboard: %s\n' "$title"
+        else
+            fail "grafana dashboard $uid"
+        fi
+    done
+else
+    fail "grafana health at $grafana; dashboards not checked"
+fi
+
+if ! curl -fsS "$prom/-/ready" >/dev/null; then
+    fail "prometheus not ready at $prom; scrape, rules, panel queries, variables and annotations not checked"
+    summary
+fi
+
+up=$(curl -fsS "$prom/api/v1/query" --data-urlencode 'query=min(up and on (job, instance) ehlo_build_info)' | jq -r '.data.result[0].value[1] // "missing"') || up=error
 [[ "$up" == "1" ]] || fail "ehlo scrape target up=$up"
 
-bad_rules=$(curl -fsS "$prom/api/v1/rules" | jq -r '[.data.groups[].rules[] | select(.health != "ok") | .name] | join(", ")')
+bad_rules=$(curl -fsS "$prom/api/v1/rules" | jq -r '[.data.groups[].rules[] | select(.health != "ok") | .name] | join(", ")') || bad_rules="rules api failed"
 [[ -z "$bad_rules" ]] || fail "rules not healthy: $bad_rules"
-unlabeled=$(curl -fsS "$prom/api/v1/rules?type=alert" | jq -r '[.data.groups[].rules[] | select(.labels.component != "ehlo") | .name] | join(", ")')
+unlabeled=$(curl -fsS "$prom/api/v1/rules?type=alert" | jq -r '[.data.groups[].rules[] | select(.labels.component != "ehlo") | .name] | join(", ")') || unlabeled="rules api failed"
 [[ -z "$unlabeled" ]] || fail "alerts without component=ehlo, hidden from the dashboards: $unlabeled"
 
 while IFS=$'\t' read -r panel expr; do
@@ -72,8 +98,4 @@ while IFS= read -r expr; do
     fi
 done < <(jq -r '.spec.annotations[].spec.legacyOptions.expr' grafana/dashboards/*.json | sort -u)
 
-if (( failures > 0 )); then
-    printf '\n%d smoke failures\n' "$failures"
-    exit 1
-fi
-printf '\nsmoke passed\n'
+summary

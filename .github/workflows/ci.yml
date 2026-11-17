@@ -38,16 +38,17 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with:
-          version: v2.15.0
-          install-mode: goinstall
+          cache-dependency-path: |
+            go.sum
+            tools/*/go.sum
+      - name: golangci-lint
+        run: go tool -modfile=tools/golangci-lint/go.mod golangci-lint run
       - name: govulncheck
-        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+        run: go tool -modfile=tools/govulncheck/go.mod govulncheck ./...
       - name: actionlint
-        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+        run: go tool -modfile=tools/actionlint/go.mod actionlint
       - name: goreleaser check
-        run: go run github.com/goreleaser/goreleaser/v2@v2.20.2 check
+        run: go tool -modfile=tools/goreleaser/go.mod goreleaser check
 
   chart:
     runs-on: ubuntu-26.04

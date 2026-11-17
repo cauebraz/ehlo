@@ -2,7 +2,7 @@
 
 ## Setup
 
-Requires Go 1.27 or later, Docker with Compose v2, [just](https://github.com/casey/just), and [golangci-lint](https://golangci-lint.run) v2.15.0 for `just lint`.
+Requires Go 1.27 or later, Docker with Compose v2 and [just](https://github.com/casey/just). The checks mount files from the checkout into containers, so with Colima keep the checkout under your home directory, the only path Colima shares with its VM by default. The lint and chart tools build from the modules in `tools/`, one per tool, at the versions pinned there.
 
 ```
 just check    # the CI check job: format, tidy, vet, race tests, generated dashboards, rule tests, compose config
@@ -12,6 +12,7 @@ just smoke    # the CI smoke job: every dashboard panel returns data
 just chart    # the CI chart job: helm lint, template and kubeconform
 just chart-e2e  # the chart on a throwaway kind cluster with kube-prometheus-stack
 just classic  # classic (v1) dashboards, imported into Grafana 12.4 and 13.3
+just outdated  # pins Dependabot does not update, next to the newest upstream release
 just screenshots  # docs/images/dashboards from a throwaway stack, about 35 minutes
 ```
 
@@ -58,7 +59,7 @@ The config file is decoded over the defaults, so a key set to zero stays zero. D
 - Standard Go. Wrap errors with `%w`. Every goroutine has a way to stop.
 - Keep dependencies few. Today there are two direct ones: the Prometheus client and a YAML parser.
 - Example IPs come from `203.0.113.0/24`. No real company, customer or IP in code, tests or docs.
-- Pin every external reference: actions by commit SHA with the version in a comment, images by tag and digest, `go run` tools by exact version. Dependabot updates them weekly.
+- Pin every external reference: actions by commit SHA with the version in a comment, images by tag and digest, Go tools by a `tool` directive in their own module under `tools/`. Dependabot updates these weekly. Downloaded binaries (syft, kind, kubectl, Helm) and the charts and images of the kind e2e are pinned in the scripts and workflows; the weekly `outdated` workflow (`just outdated`) lists the ones behind upstream.
 - Commit titles follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/): `<type>(<scope>): <summary>`, for example `fix(postfix): parse long queue ids`. Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `ci`, `build`, `perf`, `revert`. A breaking change adds `!` after the scope.
 - User-visible changes get a line in `CHANGELOG.md` under Unreleased.
 

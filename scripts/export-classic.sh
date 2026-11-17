@@ -26,7 +26,8 @@ verify_images=(
 )
 min_grafana=12.4.15
 password=$(openssl rand -hex 12)
-work=$(mktemp -d)
+mkdir -p .tmp
+work=$(mktemp -d "$PWD/.tmp/classic.XXXXXX")
 containers=()
 
 cleanup() {
