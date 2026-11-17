@@ -94,6 +94,7 @@ func (p Policy) closeDay(l *Lane) {
 		l.PausedFor = 0
 	case l.State == Paused:
 		l.PausedFor = 0
+		l.History = nil
 	}
 	if p.IdleDaysReset > 0 && l.IdleDays >= p.IdleDaysReset && l.Target > p.StartLimit {
 		l.IdleDays = 0

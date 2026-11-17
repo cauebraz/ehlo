@@ -239,6 +239,24 @@ func TestPauseAndResumeAtHalf(t *testing.T) {
 	}
 }
 
+func TestResumedLaneDoesNotPauseOnTheOldDay(t *testing.T) {
+	e, c := newEngine(t, Targets{Default: 1_000_000, Warm: []string{"mx-1"}})
+	feed(e, attempt("mx-1", "gmail", 10_000))
+	feed(e, reply("mx-1", "gmail", 250, 10_000))
+	feed(e, complaint(40))
+	c.nextDay(2)
+	if d := e.Decide("mx-1", "gmail"); d.State != Holding {
+		t.Fatalf("after the pause = %s, want holding", d.State)
+	}
+	feed(e, attempt("mx-1", "gmail", 1_000))
+	feed(e, reply("mx-1", "gmail", 250, 1_000))
+	c.nextDay(1)
+	d := e.Decide("mx-1", "gmail")
+	if d.State == Paused || math.Abs(d.Limit-d.Target/2) > 1e-6 {
+		t.Errorf("clean day after the resume = %+v, want the lane open at half the target", d)
+	}
+}
+
 func TestBackoffHalvesTheHour(t *testing.T) {
 	e, c := newEngine(t, Targets{Default: 100_000})
 	feed(e, attempt("mx-1", "gmail", 100))
