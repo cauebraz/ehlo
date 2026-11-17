@@ -75,7 +75,7 @@ var rules = []rule{
 	// Recipient: the address does not exist or refuses the sender.
 	{cat: InvalidRecipient, enhanced: re(`^5\.(1\.[1-9][0-9]*|2\.1|4\.1)$`)},
 	{cat: InvalidRecipient, tag: re(`^OFR\d{3}_416$`)},
-	{cat: InvalidRecipient, text: re(`(?i)(no such|unknown|invalid|does not exist|not found).{0,20}(user|recipient|mailbox|address)|user unknown|mailbox unavailable|recipient (address )?rejected|not our customer|policy rejection on the target address`)},
+	{cat: InvalidRecipient, text: re(`(?i)(no such|unknown|invalid|does not exist|not found).{0,20}(user|recipient|mailbox|address)|(user|recipient|mailbox) (is )?(unknown|not found|does not exist)|does ?n.?t have an? [a-z0-9-]+\.[a-z0-9.-]+ account|mailbox unavailable|recipient (address )?rejected|not our customer|policy rejection on the target address`)},
 	// Mailbox: full.
 	{cat: MailboxFull, enhanced: re(`^[45]\.2\.2$`)},
 	{cat: MailboxFull, text: re(`(?i)mailbox (is )?full|over quota|quota exceeded|storage`)},

@@ -23,6 +23,7 @@ First version.
 - SES events are dated by their own timestamp, suppressed addresses are skipped, and an open is one event. SendGrid `blocked` bounces are soft, `dropped` is skipped, and `deferred` keeps the reply text.
 - The Postfix tailer keeps the provider code on greeting refusals and EHLO replies, reads RFC 5424 lines, skips `retry(8)` and lines over 1 MiB, and drops batches the server refuses instead of resending them.
 - Microsoft `5.7.507` is a reputation block and `5.7.510` a policy reply, not an invalid recipient.
+- Replies that name a missing recipient after the word, such as "mailbox not found" and Yahoo's "This user doesn't have a yahoo.com account", are `invalid_recipient` instead of `other`.
 - The container image creates `/data` for the non-root user, so the warmup snapshot persists.
 - Request bounds: `POST /v1/events` takes at most 10,000 events (413 above, and nothing is recorded), an empty batch gets 400, request headers are capped at 64 KiB (431), error messages at 256 bytes, and cross-origin browser POSTs get 403. The SendGrid webhook takes at most 10,000 events.
 - Series bounds: `ehlo_events_total` counts unknown event types as `type="unknown"`. `ehlo_smtp_replies_total` keeps at most 64 detailed codes per route, source and provider and 4,096 other code series; past those bounds a reply counts under its bare code or its class (`4xx`), and documented provider codes are always kept. Reply codes 300-399 are invalid.
