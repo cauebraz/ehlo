@@ -12,8 +12,8 @@ sources: [mx-1, mx-2, mx-3, mx-4]
 targets:
   # Daily volume each source grows toward. 0 leaves a source unmanaged.
   default: 200000
-  # How a source's volume splits across providers. Unlisted providers
-  # share what is left.
+  # Share of a source's volume per provider. Each unlisted provider may use
+  # the whole rest (here 15%, or 30000), so the targets can sum past default.
   mix: {gmail: 0.55, outlook: 0.20, yahoo: 0.10}
   # Sources that start at full volume instead of warming up.
   warm: [mx-1, mx-2, mx-3, mx-4]
@@ -36,10 +36,19 @@ warmup:
     block_ratio: 0.01             # reputation block replies end the lane's day
 
 # Recipient domain to provider. The built-in list covers Gmail, Outlook,
-# Yahoo, iCloud and about 25 regional providers. Entries here replace it.
+# Yahoo, iCloud and about 25 regional providers. Entries here replace it,
+# so name every provider that growth, shaping or mix names, defaults
+# included (gmail, outlook, yahoo, icloud), or the server does not start.
+# Other domains count as "other". To add domains, use providers_extra.
 # providers:
 #   - name: gmail
 #     domains: [gmail.com, googlemail.com, .google.com]
+#   - name: outlook
+#     domains: [outlook.com, hotmail.com, live.com, msn.com]
+#   - name: yahoo
+#     domains: [yahoo.com, ymail.com, aol.com]
+#   - name: icloud
+#     domains: [icloud.com, me.com, mac.com]
 
 # Rules added after the built-in list (or after providers, when set). For a
 # domain both list, the entry here wins. A leading dot matches subdomains.
