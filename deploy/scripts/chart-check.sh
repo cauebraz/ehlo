@@ -5,13 +5,15 @@
 # Kubernetes and CRD schemas, checks that deploy/helm/ehlo/files matches
 # the committed monitoring files, that the PrometheusRule, dashboard
 # ConfigMaps and GrafanaManifest objects equal ehlo-monitoring render output
-# (chart labels and namespace aside), and that webhookSecret with
-# existingConfigSecret fails to render.
+# (chart labels and namespace aside), and that three inputs fail to render:
+# webhookSecret with existingConfigSecret, the checkout without image.tag,
+# and values that values.schema.json rejects.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 chart=deploy/helm/ehlo
 helm=$(deploy/scripts/helm.sh path)
+tag=(--set image.tag=ci)
 
 kubeconform_mod=github.com/yannh/kubeconform/cmd/kubeconform@v0.8.0
 yq_mod=github.com/mikefarah/yq/v4@v4.54.3
@@ -25,9 +27,9 @@ step "chart files match the committed monitoring files"
 deploy/scripts/chart-files.sh -check
 
 step "helm lint"
-"$helm" lint "$chart" --strict
+"$helm" lint "$chart" --strict "${tag[@]}"
 for f in deploy/helm/ci/*.yaml; do
-    "$helm" lint "$chart" --strict -f "$f"
+    "$helm" lint "$chart" --strict "${tag[@]}" -f "$f"
 done
 
 step "helm template | kubeconform"
@@ -35,7 +37,7 @@ out=$(mktemp -d)
 trap 'rm -rf "$out"' EXIT
 GOBIN="$out" go install "$kubeconform_mod"
 for f in deploy/helm/ci/*.yaml; do
-    "$helm" template ehlo "$chart" --namespace ehlo -f "$f" > "$out/$(basename "$f")"
+    "$helm" template ehlo "$chart" "${tag[@]}" --namespace ehlo -f "$f" > "$out/$(basename "$f")"
     for v in "${kube_versions[@]}"; do
         "$out/kubeconform" -strict -summary -kubernetes-version "$v" \
             -schema-location "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/$k8s_schemas/{{.NormalizedKubernetesVersion}}-standalone{{.StrictSuffix}}/{{.ResourceKind}}{{.KindSuffix}}.json" \
@@ -45,7 +47,7 @@ for f in deploy/helm/ci/*.yaml; do
 done
 
 step "rules reach the PrometheusRule without template evaluation"
-"$helm" template ehlo "$chart" --set prometheusRule.enabled=true --show-only templates/prometheusrule.yaml | grep -q '\$labels' \
+"$helm" template ehlo "$chart" "${tag[@]}" --set prometheusRule.enabled=true --show-only templates/prometheusrule.yaml | grep -q '\$labels' \
     || { echo "PrometheusRule lost {{ \$labels }}"; exit 1; }
 
 step "chart objects match ehlo-monitoring render"
@@ -66,7 +68,7 @@ for format in prometheusrule configmap grafanamanifest; do
         configmap) show=templates/dashboards.yaml ;;
         grafanamanifest) show=templates/grafanamanifests.yaml ;;
     esac
-    "$helm" template ehlo "$chart" --namespace ehlo --set prometheusRule.enabled=true --set dashboards.enabled=true \
+    "$helm" template ehlo "$chart" "${tag[@]}" --namespace ehlo --set prometheusRule.enabled=true --set dashboards.enabled=true \
         --set grafanaManifests.enabled=true --show-only "$show" | "$out/yq" ea -N "$normalize" - > "$out/got-$format.yaml"
     [[ -s "$out/want-$format.yaml" ]] || { echo "ehlo-monitoring render -format $format wrote no objects"; exit 1; }
     diff -u "$out/want-$format.yaml" "$out/got-$format.yaml" >"$out/diff-$format" \
@@ -75,10 +77,26 @@ for format in prometheusrule configmap grafanamanifest; do
 done
 
 step "webhookSecret with existingConfigSecret fails"
-if err=$("$helm" template ehlo "$chart" --set existingConfigSecret=ehlo-config --set webhookSecret.name=ehlo-webhooks 2>&1); then
+if err=$("$helm" template ehlo "$chart" "${tag[@]}" --set existingConfigSecret=ehlo-config --set webhookSecret.name=ehlo-webhooks 2>&1); then
     echo "rendering with existingConfigSecret and webhookSecret.name succeeded, want a failure"; exit 1
 fi
 grep -q 'webhookSecret does not apply with existingConfigSecret' <<<"$err" || { echo "unexpected error: $err"; exit 1; }
 echo "fails as expected"
+
+step "a checkout without image.tag fails"
+if err=$("$helm" template ehlo "$chart" 2>&1); then
+    echo "rendering the checkout without image.tag succeeded, want a failure"; exit 1
+fi
+grep -q 'image.tag is required' <<<"$err" || { echo "unexpected error: $err"; exit 1; }
+echo "fails as expected"
+
+step "values.schema.json rejects unknown keys and wrong types"
+for bad in serviceMonitor.enable=true service.port=http persistence.enabled=yes 'image.digest=sha256:abc'; do
+    if err=$("$helm" template ehlo "$chart" "${tag[@]}" --set-string "$bad" 2>&1); then
+        echo "--set-string $bad rendered, want a schema error"; exit 1
+    fi
+    grep -q 'specifications of the schema' <<<"$err" || { echo "--set-string $bad: unexpected error: $err"; exit 1; }
+done
+echo "rejected as expected"
 
 printf '\nchart checks passed\n'

@@ -37,7 +37,11 @@ app.kubernetes.io/part-of: ehlo
 {{- end }}
 
 {{- define "ehlo.image" -}}
-{{- $ref := printf "%s:%s" .Values.image.repository (default .Chart.AppVersion .Values.image.tag) }}
+{{- $tag := default .Chart.AppVersion .Values.image.tag }}
+{{- if eq $tag "0.0.0" }}
+{{- fail "image.tag is required when installing the chart from a checkout: no image 0.0.0 exists. Set it to a release version, or to the tag of an image you built" }}
+{{- end }}
+{{- $ref := printf "%s:%s" .Values.image.repository $tag }}
 {{- if .Values.image.digest }}
 {{- $ref = printf "%s@%s" $ref .Values.image.digest }}
 {{- end }}

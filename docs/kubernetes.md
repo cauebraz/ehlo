@@ -25,6 +25,15 @@ config:
 
 `config` is `ehlo.yaml` ([limits.md](limits.md#configuration) lists every key). The chart sets `listen: ":8080"` and runs `ehlo serve -state /data/warmup.json`.
 
+To install from a checkout, set `image.tag`: the chart in the repository has appVersion `0.0.0`, no image has that tag, and the chart fails to render without one.
+
+```
+helm install ehlo deploy/helm/ehlo --namespace ehlo --create-namespace \
+  --set image.tag=<version> -f values.yaml
+```
+
+`values.schema.json` makes Helm reject an unknown key or a wrong type at install, such as `serviceMonitor.enable` or `service.port: http`. The keys under `config` are checked by ehlo at start.
+
 ## One replica
 
 The Deployment runs one replica with the `Recreate` strategy, and the chart has no `replicas` value. ehlo keeps each lane's limit, sent count, holds and backoffs in memory and writes them to `/data/warmup.json` every 30 seconds and on shutdown. Two replicas would count sends separately, grow limits on half the data, and overwrite each other's snapshot. `Recreate` stops the old pod before the new one mounts the `ReadWriteOnce` volume.
@@ -82,7 +91,7 @@ dashboards:
 
 The dashboards use the Grafana dashboard schema v2 and need Grafana 13 or later. kube-prometheus-stack 93.3.1 ships Grafana 13.3.1. The bundled rules and dashboards do not filter on `job`; `serviceMonitor.job` sets that label when your own queries expect one.
 
-`deploy/scripts/kind-e2e.sh` (`just chart-e2e`) installs kube-prometheus-stack 93.3.1 with [deploy/kind/kube-prometheus-stack.yaml](../deploy/kind/kube-prometheus-stack.yaml) and this chart on a kind cluster, and checks that ehlo answers `/healthz`, that `up{service="ehlo"}` is 1, that every ehlo rule has health `ok`, that Grafana lists every dashboard, and that a webhook returns 401 without the token and 202 with it, first with the token from `webhookSecret`, then from `existingConfigSecret`. The values file pins every image the install pulls by digest.
+`deploy/scripts/kind-e2e.sh` (`just chart-e2e`) installs kube-prometheus-stack 93.3.1 with [deploy/kind/kube-prometheus-stack.yaml](../deploy/kind/kube-prometheus-stack.yaml) and this chart on a kind cluster, and checks that ehlo answers `/healthz`, that `up{service="ehlo"}` is 1, that every ehlo rule has health `ok`, that Grafana lists every dashboard, that a lane's sent count is the same after `kubectl rollout restart`, that `up` is 1 again through the PodMonitor, that Grafana Operator 5.26.0 marks every `GrafanaManifest` `ManifestSynchronized`, and that a webhook returns 401 without the token and 202 with it, first with the token from `webhookSecret`, then from `existingConfigSecret`. The script and the values file pin every image the install pulls by digest.
 
 ## Rules and dashboards
 
@@ -124,7 +133,7 @@ Without a local mimirtool: `docker run --rm -v "$PWD/mimir:/rules:ro" grafana/mi
 
 | Key | Default | Purpose |
 |-----|---------|---------|
-| `image.repository`, `image.tag`, `image.digest` | `ghcr.io/cauebraz/ehlo`, appVersion, release digest | Image reference, rendered as `repository:tag@digest` |
+| `image.repository`, `image.tag`, `image.digest` | `ghcr.io/cauebraz/ehlo`, appVersion, release digest | Image reference, rendered as `repository:tag@digest`; `image.tag` is required from a checkout |
 | `config` | `sources: []`, `targets.default: 0` | `ehlo.yaml` |
 | `existingConfigSecret`, `existingConfigSecretKey` | `""`, `ehlo.yaml` | Secret with the whole config, replaces `config` |
 | `webhookSecret.name`, `.tokenKey`, `.sendgridPublicKeyKey` | `""`, `token`, `""` | Secret mounted at `/etc/ehlo-secrets`; sets `webhooks.token_file` and `webhooks.sendgrid_public_key_file`; not allowed with `existingConfigSecret` |

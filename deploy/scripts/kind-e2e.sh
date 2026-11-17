@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # Usage: deploy/scripts/kind-e2e.sh [-keep]
-# Creates a kind cluster, installs kube-prometheus-stack and the ehlo chart
-# built from this checkout, and checks that ehlo answers /healthz, that
-# Prometheus scrapes it, that every ehlo rule loads with health ok, that
-# Grafana's sidecar loads every dashboard, and that the webhook token from
-# webhookSecret and from existingConfigSecret is enforced (401 without it,
-# 202 with it). Deletes the cluster at the end
-# unless -keep is given. Needs Docker, kind and kubectl.
+# Creates a kind cluster, installs kube-prometheus-stack, the Grafana
+# Operator and the ehlo chart built from this checkout, and checks that ehlo
+# answers /healthz, that Prometheus scrapes it through the ServiceMonitor
+# and then the PodMonitor, that every ehlo rule loads with health ok, that
+# Grafana's sidecar loads every dashboard, that the Grafana Operator syncs
+# every GrafanaManifest, that a lane's sent count survives a pod restart,
+# and that the webhook token from webhookSecret and from
+# existingConfigSecret is enforced (401 without it, 202 with it). Deletes
+# the cluster at the end unless -keep is given. Needs Docker, kind, kubectl
+# and jq.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -15,6 +18,11 @@ node_image=kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e
 kps_chart=oci://ghcr.io/prometheus-community/charts/kube-prometheus-stack
 kps_version=93.3.1
 kps_digest=sha256:ffe8e72492d5bad79fc6468f69afa2f0303983195993f7bd26ae86721e2d8ebe
+gop_chart=oci://ghcr.io/grafana/helm-charts/grafana-operator
+gop_version=5.26.0
+gop_digest=sha256:ed199fff9f727777762762496c5663047d46fc208889ba568420e3f11e490539
+gop_image_tag=v5.26.0@sha256:f7051c56e3e0d3581455c2755d3493d0c308e555e1b8604ce77bf6db7ed6c5df
+grafana_image=docker.io/grafana/grafana:13.3.1@sha256:0615ec4fbd4072004b7d86b46ded63013a74b7d6eb1119273dd89e8fa25c13cf
 image=ehlo:e2e
 ns=ehlo
 mon=monitoring
@@ -91,6 +99,8 @@ echo
 curl -fsS "http://127.0.0.1:$ehlo_port/metrics" | grep -c '^ehlo_' | sed 's/^/ehlo_ samples: /'
 
 step "Prometheus scrapes ehlo"
+prom_ready() { k -n "$mon" wait pod -l app.kubernetes.io/name=prometheus --for=condition=Ready --timeout 10s >/dev/null 2>&1; }
+retry 30 "Prometheus pod ready" prom_ready
 forward "$mon" svc/kps-kube-prometheus-stack-prometheus "$prom_port" 9090 /-/ready
 scraped() {
     curl -fsS "http://127.0.0.1:$prom_port/api/v1/query" --data-urlencode 'query=up{namespace="'"$ns"'",service="ehlo"}' \
@@ -124,6 +134,43 @@ for uid in $want; do
     api=$(curl -fsS -u "admin:$gpass" "http://127.0.0.1:$grafana_port/apis/dashboard.grafana.app/v2/namespaces/default/dashboards/$uid" | jq -r '"\(.apiVersion) \(.spec.title) folder=\(.metadata.annotations["grafana.app/folder"] // "")"')
     echo "$uid: $api"
 done
+
+step "warmup state survives a pod restart"
+now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+for _ in 1 2 3; do printf '{"type":"attempt","time":"%s","source":"mx-2","domain":"gmail.com"}\n' "$now"; done \
+    | curl -fsS -X POST --data-binary @- "http://127.0.0.1:$ehlo_port/v1/events" >/dev/null
+sent() { curl -fsS "http://127.0.0.1:$1/v1/limits/mx-2/gmail" | jq -r .sent; }
+[[ "$(sent "$ehlo_port")" == 3 ]] || { echo "mx-2/gmail sent $(sent "$ehlo_port") before the restart, want 3"; exit 1; }
+k -n "$ns" rollout restart deployment/ehlo
+k -n "$ns" rollout status deployment/ehlo --timeout 3m
+forward "$ns" svc/ehlo "$((ehlo_port + 3))" 8080 /healthz
+[[ "$(sent "$((ehlo_port + 3))")" == 3 ]] || { echo "mx-2/gmail sent $(sent "$((ehlo_port + 3))") after the restart, want 3"; exit 1; }
+echo "mx-2/gmail sent 3 before and after the restart"
+
+step "Prometheus scrapes ehlo through the PodMonitor"
+"$helm" upgrade ehlo deploy/helm/ehlo --kube-context "$ctx" --namespace "$ns" --reuse-values \
+    --set serviceMonitor.enabled=false --set podMonitor.enabled=true --set podMonitor.labels.release=kps --wait --timeout 5m
+pod_scraped() {
+    curl -fsS "http://127.0.0.1:$prom_port/api/v1/query" --data-urlencode 'query=up{namespace="'"$ns"'",job="'"$ns"'/ehlo"}' \
+        | jq -e '.data.result | length == 1 and .[0].value[1] == "1"' >/dev/null
+}
+retry 18 'up{job="'"$ns"'/ehlo"} == 1' pod_scraped
+curl -fsS "http://127.0.0.1:$prom_port/api/v1/query" --data-urlencode 'query=up{job="'"$ns"'/ehlo"}' | jq -c '.data.result[] | {metric: .metric | {job, namespace, pod}, value: .value[1]}'
+
+step "Grafana Operator $gop_version syncs the GrafanaManifest objects"
+"$helm" install grafana-operator "$gop_chart:$gop_version@$gop_digest" \
+    --kube-context "$ctx" --namespace grafana-operator --create-namespace \
+    --set image.tag="$gop_image_tag" --wait --timeout 5m
+printf 'apiVersion: grafana.integreatly.org/v1beta1\nkind: Grafana\nmetadata:\n  name: grafana\n  labels:\n    dashboards: grafana\nspec:\n  version: %s\n' "$grafana_image" \
+    | k -n "$ns" apply -f -
+"$helm" upgrade ehlo deploy/helm/ehlo --kube-context "$ctx" --namespace "$ns" --reuse-values \
+    --set grafanaManifests.enabled=true --wait --timeout 5m
+want_n=$(echo "$want" | wc -l | tr -d ' ')
+got_n=$(k -n "$ns" get grafanamanifests -l app.kubernetes.io/instance=ehlo -o name | wc -l | tr -d ' ')
+[[ "$got_n" == "$want_n" ]] || { echo "$got_n GrafanaManifest objects, want $want_n"; exit 1; }
+k -n "$ns" wait grafanamanifests -l app.kubernetes.io/instance=ehlo --for=condition=ManifestSynchronized --timeout 5m
+k -n "$ns" get grafanamanifests -l app.kubernetes.io/instance=ehlo \
+    -o custom-columns='NAME:.metadata.name,SYNCED:.status.conditions[?(@.type=="ManifestSynchronized")].status'
 
 webhook_codes() {
     local port=$1 token=$2 code

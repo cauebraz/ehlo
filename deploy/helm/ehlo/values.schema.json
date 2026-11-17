@@ -1,0 +1,179 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ehlo chart values",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "stringMap": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "objectList": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "duration": {
+      "type": "string",
+      "pattern": "^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$"
+    },
+    "probe": {
+      "type": "object"
+    },
+    "scrape": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "labels": { "$ref": "#/definitions/stringMap" },
+        "annotations": { "$ref": "#/definitions/stringMap" },
+        "interval": { "$ref": "#/definitions/duration" },
+        "scrapeTimeout": { "$ref": "#/definitions/duration" },
+        "job": { "type": "string" },
+        "relabelings": { "$ref": "#/definitions/objectList" },
+        "metricRelabelings": { "$ref": "#/definitions/objectList" }
+      }
+    }
+  },
+  "properties": {
+    "global": { "type": "object" },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string" },
+        "digest": { "type": "string", "pattern": "^(sha256:[0-9a-f]{64})?$" },
+        "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never"] }
+      }
+    },
+    "imagePullSecrets": { "$ref": "#/definitions/objectList" },
+    "nameOverride": { "type": "string" },
+    "fullnameOverride": { "type": "string" },
+    "config": {
+      "type": "object",
+      "properties": {
+        "webhooks": { "type": "object" }
+      }
+    },
+    "existingConfigSecret": { "type": "string" },
+    "existingConfigSecretKey": { "type": "string", "minLength": 1 },
+    "webhookSecret": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "tokenKey": { "type": "string" },
+        "sendgridPublicKeyKey": { "type": "string" }
+      }
+    },
+    "extraArgs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "persistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "existingClaim": { "type": "string" },
+        "storageClassName": { "type": "string" },
+        "accessModes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "enum": ["ReadWriteOnce", "ReadWriteOncePod", "ReadWriteMany", "ReadOnlyMany"] }
+        },
+        "size": { "type": "string", "minLength": 1 },
+        "annotations": { "$ref": "#/definitions/stringMap" }
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "annotations": { "$ref": "#/definitions/stringMap" },
+        "labels": { "$ref": "#/definitions/stringMap" }
+      }
+    },
+    "webhookIngress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "className": { "type": "string" },
+        "host": { "type": "string" },
+        "tlsSecretName": { "type": "string" },
+        "annotations": { "$ref": "#/definitions/stringMap" }
+      }
+    },
+    "networkPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "from": { "$ref": "#/definitions/objectList" }
+      }
+    },
+    "podAnnotations": { "$ref": "#/definitions/stringMap" },
+    "podLabels": { "$ref": "#/definitions/stringMap" },
+    "serviceAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "create": { "type": "boolean" },
+        "name": { "type": "string" },
+        "annotations": { "$ref": "#/definitions/stringMap" },
+        "automountServiceAccountToken": { "type": "boolean" }
+      }
+    },
+    "podSecurityContext": { "type": "object" },
+    "securityContext": { "type": "object" },
+    "resources": { "type": "object" },
+    "livenessProbe": { "$ref": "#/definitions/probe" },
+    "readinessProbe": { "$ref": "#/definitions/probe" },
+    "terminationGracePeriodSeconds": { "type": "integer", "minimum": 0 },
+    "nodeSelector": { "$ref": "#/definitions/stringMap" },
+    "tolerations": { "$ref": "#/definitions/objectList" },
+    "affinity": { "type": "object" },
+    "priorityClassName": { "type": "string" },
+    "extraEnv": { "$ref": "#/definitions/objectList" },
+    "extraVolumes": { "$ref": "#/definitions/objectList" },
+    "extraVolumeMounts": { "$ref": "#/definitions/objectList" },
+    "serviceMonitor": { "$ref": "#/definitions/scrape" },
+    "podMonitor": { "$ref": "#/definitions/scrape" },
+    "prometheusRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "labels": { "$ref": "#/definitions/stringMap" },
+        "annotations": { "$ref": "#/definitions/stringMap" }
+      }
+    },
+    "dashboards": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "label": { "type": "string", "minLength": 1 },
+        "labelValue": { "type": "string" },
+        "namespace": { "type": "string" },
+        "labels": { "$ref": "#/definitions/stringMap" },
+        "annotations": { "$ref": "#/definitions/stringMap" }
+      }
+    },
+    "grafanaManifests": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "labels": { "$ref": "#/definitions/stringMap" },
+        "instanceSelector": { "type": "object" },
+        "folderUID": { "type": "string" },
+        "allowCrossNamespaceImport": { "type": "boolean" },
+        "resyncPeriod": { "type": "string", "pattern": "^$|^(0|([0-9]+(\\.[0-9]+)?(ns|us|ms|s|m|h))+)$" }
+      }
+    }
+  }
+}

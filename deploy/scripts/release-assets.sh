@@ -35,6 +35,8 @@ deploy/scripts/chart-files.sh -check
 cp -R deploy/helm/ehlo "$work/chart"
 sed -i.bak 's|^  digest: ""$|  digest: "'"$digest"'"|' "$work/chart/values.yaml" && rm "$work/chart/values.yaml.bak"
 grep -q "^  digest: \"$digest\"$" "$work/chart/values.yaml" || { echo "image.digest not set in values.yaml" >&2; exit 1; }
+sed -i.bak -e 's|^version: 0\.0\.0$|version: '"$version"'|' -e 's|^appVersion: "0\.0\.0"$|appVersion: "'"$version"'"|' "$work/chart/Chart.yaml" && rm "$work/chart/Chart.yaml.bak"
+grep -q "^appVersion: \"$version\"$" "$work/chart/Chart.yaml" || { echo "appVersion not set in Chart.yaml" >&2; exit 1; }
 deploy/scripts/helm.sh lint "$work/chart" --strict
 deploy/scripts/helm.sh package "$work/chart" --version "$version" --app-version "$version" -d "$work"
 mv "$work/ehlo-$version.tgz" "$out/ehlo-chart-$version.tgz"
