@@ -31,7 +31,8 @@ type Policy struct {
 	// HoldBounceRatio holds the limit when bounces over attempts reach it.
 	HoldBounceRatio float64 `yaml:"hold_bounce_ratio" json:"hold_bounce_ratio"`
 	// MinSample is the number of deliveries the trailing window needs before
-	// its ratios count. Below it the absolute complaint counts apply.
+	// its complaint ratios count, and of first attempts before its bounce
+	// ratio counts. Below it the absolute complaint counts apply.
 	MinSample float64 `yaml:"min_sample" json:"min_sample"`
 	PauseDays int     `yaml:"pause_days" json:"pause_days"`
 	// EngagedFirst asks the sender to pick recently engaged recipients while

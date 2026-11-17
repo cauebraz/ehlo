@@ -58,7 +58,7 @@ func (p Policy) verdict(l *Lane, today, win dayStats) verdict {
 		return verdict{Holding, p.resumeLimit(l), "blocked by the provider yesterday", keep}
 	case (!enough && today.Complaints >= p.HoldComplaints) || (enough && complaintRatio >= p.HoldComplaintRatio):
 		return verdict{Holding, l.Limit, complaintReason(win, days), keep}
-	case enough && bounceRatio >= p.HoldBounceRatio:
+	case win.Sent >= p.MinSample && bounceRatio >= p.HoldBounceRatio:
 		return verdict{Holding, l.Limit, fmt.Sprintf("bounces at %.1f%% of attempts over %d days", bounceRatio*100, days), keep}
 	case l.BackedOff:
 		return verdict{Holding, l.Limit, "backed off yesterday", keep}

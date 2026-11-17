@@ -28,7 +28,7 @@ With `targets.default: 200000` and `mix: {gmail: 0.55, outlook: 0.20, yahoo: 0.1
 | Reputation block replies reach 1% of attempts in 5 minutes | Lane stops until the next day, which opens at half its last good limit |
 | No first attempt for 30 days | Limit returns to `start_limit` |
 
-A resumed limit is never below `start_limit` or above the target. Ratios cover the last three closed days, so late feedback still counts. A pause empties that window when it ends, so the days that caused it do not pause the lane again. Below 50 deliveries in that window, daily counts replace the complaint ratios: 2 complaints hold, 3 pause. The backoff rules need at least 20 attempts and 5 matching replies in the window.
+A resumed limit is never below `start_limit` or above the target. Ratios cover the last three closed days, so late feedback still counts. A pause empties that window when it ends, so the days that caused it do not pause the lane again. Below 50 deliveries in that window, daily counts replace the complaint ratios: 2 complaints hold, 3 pause. The bounce ratio applies from 50 first attempts, so a new lane that bounces most of its first 50 messages holds. The backoff rules need at least 20 attempts and 5 matching replies in the window.
 
 With every day clean and fully used, a lane goes from 50 to 100,000 a day in 19 days toward Gmail, 23 toward most providers, 26 toward Yahoo and 29 toward Microsoft.
 
@@ -112,7 +112,7 @@ All keys are optional. Unknown keys fail the start, and so do `growth`, `shaping
 | `hold_complaint_ratio`, `pause_complaint_ratio` | 0.001, 0.003 | Complaints over deliveries that hold or pause |
 | `hold_bounce_ratio` | 0.03 | Bounces over first attempts that hold |
 | `hold_complaints`, `pause_complaints` | 2, 3 | Daily complaint counts that hold or pause below `min_sample` |
-| `min_sample` | 50 | Deliveries in the window before ratios apply |
+| `min_sample` | 50 | Deliveries in the window before the complaint ratios apply, and first attempts before the bounce ratio applies |
 | `trailing_days` | 3 | Closed days the ratios cover, 1-14 |
 | `pause_days` | 1 | Length of a pause |
 | `resume_fraction` | 0.5 | Share of the last good limit after a pause or block |
