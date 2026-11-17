@@ -20,12 +20,37 @@ Mailbox providers judge each sending IP by its history. An IP that sends 100,000
 
 ## What ehlo does
 
-```
-Postfix, KumoMTA, PowerMTA,      events      +------+   /metrics    Prometheus, Grafana:
-SES, SendGrid, your code    ---------------> | ehlo | ------------> 9 dashboards, 18 alerts
-                                             |      |
-your sending code           <--------------- |      |
-(picks a server per batch)   GET /v1/limits  +------+
+```mermaid
+flowchart LR
+    sender["<b>Your sending code</b><br/>picks a server per batch"]
+    mta["<b>Your MTAs and ESPs</b><br/>Postfix, KumoMTA, PowerMTA,<br/>SES, SendGrid"]
+    providers(["<b>Mailbox providers</b><br/>Gmail, Microsoft,<br/>Yahoo and others"])
+
+    subgraph ehlo["ehlo"]
+        direction TB
+        ingest["<b>Ingest</b><br/>events, webhooks,<br/>log tailer"]
+        classify["<b>Classify replies</b><br/>rate_limited, reputation_block,<br/>auth_failure, ..."]
+        lanes["<b>Warmup lanes</b><br/>a daily limit per<br/>server and provider"]
+        ingest --> classify --> lanes
+    end
+
+    subgraph monitoring["Prometheus and Grafana"]
+        direction TB
+        alerts["<b>18 alerts</b><br/>and recording rules"]
+        dashboards["<b>9 dashboards</b>"]
+    end
+
+    sender -- "(1) GET /v1/limits" --> ehlo
+    ehlo -. "(2) allowed_now" .-> sender
+    sender -- "(3) send the batch" --> mta
+    mta -- "(4) SMTP" --> providers
+    providers -. "(5) replies, bounces,<br/>complaints" .-> mta
+    mta -- "(6) events" --> ehlo
+    ehlo -- "/metrics" --> monitoring
+
+    classDef core stroke:#7c3aed,stroke-width:2px
+    class ingest,classify,lanes core
+    style ehlo stroke:#7c3aed,stroke-width:2px
 ```
 
 1. It reads delivery events: attempts, SMTP replies, bounces, complaints, queue sizes, DMARC rows. Adapters cover Postfix logs, KumoMTA, PowerMTA, SES and SendGrid; anything else posts JSON.
