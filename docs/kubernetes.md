@@ -6,8 +6,6 @@ The Helm chart in [deploy/helm/ehlo](../deploy/helm/ehlo) runs the ehlo server w
 
 Each release pushes the chart to `oci://ghcr.io/cauebraz/charts/ehlo` with the same version as the image, and attaches it to the GitHub release as `ehlo-chart-<version>.tgz`. A released chart references the image by tag and digest.
 
-The release workflow pushes the image first, because the chart pins its digest. It then drafts the GitHub release with GoReleaser and pushes the chart only after that job succeeds. A failed GoReleaser run can leave a pushed image without a release; it never leaves a published chart without one.
-
 ```
 helm install ehlo oci://ghcr.io/cauebraz/charts/ehlo --version <version> \
   --namespace ehlo --create-namespace -f values.yaml

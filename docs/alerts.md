@@ -1,8 +1,19 @@
 # Alerts
 
-One section per alert in `prometheus/rules/ehlo-alerts.yml`. Each alert carries a `summary`, a `description` with the first step, a `runbook_url` to its section here, and the `dashboard_uid` of the dashboard that explains it; a render with `dashboard_url` set adds an absolute `dashboard_url` ([monitoring.md](monitoring.md)). Every alert carries the labels `component="ehlo"` and `severity`; the dashboards select ehlo's alerts by `component`, so other alerts in a shared Prometheus do not change them. "Lane" means one source toward one provider. Thresholds on SMTP replies apply to the `self_hosted` route.
+One section per alert in `prometheus/rules/ehlo-alerts.yml`, with what fired it and the first thing to do. "Lane" means one source toward one provider ([limits.md](limits.md#terms)).
 
-EhloIngestInvalidEvents, EhloProviderRateLimiting, EhloReputationBlock, EhloHardBounceRateHigh and EhloConnectionFailures also need at least 5 matching events in the last 10 minutes, so one reply on a lane with little traffic does not fire them.
+| Severity | Alerts |
+|----------|--------|
+| critical | [EhloTelemetryAbsent](#ehlotelemetryabsent), [EhloProviderCapacityExhausted](#ehloprovidercapacityexhausted), [EhloDKIMUnsigned](#ehlodkimunsigned), [EhloAuthenticationRejected](#ehloauthenticationrejected), [EhloReputationBlock](#ehloreputationblock), [EhloComplaintRateHigh](#ehlocomplaintratehigh), [EhloWarmupLaneBlocked](#ehlowarmuplaneblocked) |
+| warning | [EhloIngestInvalidEvents](#ehloingestinvalidevents), [EhloProviderRateLimiting](#ehloproviderratelimiting), [EhloHardBounceRateHigh](#ehlohardbounceratehigh), [EhloFeedbackFeedStale](#ehlofeedbackfeedstale), [EhloConnectionFailures](#ehloconnectionfailures), [EhloDeferredQueueGrowing](#ehlodeferredqueuegrowing), [EhloQueueFeedStale](#ehloqueuefeedstale), [EhloDMARCUnauthenticatedSource](#ehlodmarcunauthenticatedsource) |
+| info | [EhloLaneAtDailyLimit](#ehlolaneatdailylimit), [EhloWarmupLanePaused](#ehlowarmuplanepaused) |
+
+What every alert carries:
+
+- Labels `component="ehlo"` and `severity`. The dashboards select ehlo's alerts by `component`, so other alerts in a shared Prometheus do not change them.
+- Annotations `summary`, `description` with the first step, `runbook_url` pointing to its section here, and `dashboard_uid` of the dashboard that explains it. A render with `dashboard_url` set adds an absolute `dashboard_url` ([monitoring.md](monitoring.md)).
+
+Thresholds on SMTP replies apply to the `self_hosted` route. EhloIngestInvalidEvents, EhloProviderRateLimiting, EhloReputationBlock, EhloHardBounceRateHigh and EhloConnectionFailures also need at least 5 matching events in the last 10 minutes, so one reply on a lane with little traffic does not fire them.
 
 ## EhloTelemetryAbsent
 

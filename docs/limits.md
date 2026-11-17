@@ -1,6 +1,20 @@
 # Limits
 
-ehlo keeps one lane per source and provider. Each lane has a daily limit that grows toward a target. Only `self_hosted` events feed the lanes.
+ehlo keeps one lane per source and provider. Each lane has a daily limit that grows toward a target. ehlo advises: it does not send, queue or refuse mail. The code that picks a source for a batch asks `GET /v1/limits` and stays within the answer.
+
+## Terms
+
+| Term | Meaning |
+|------|---------|
+| Source | A sending server or IP pool, named in each event's `source`, such as `mx-1` |
+| Provider | A mailbox provider such as `gmail`, `outlook` or `yahoo`. ehlo maps the recipient domain to it; unknown domains map to `other` |
+| Lane | One source toward one provider. Limits, backoffs and pauses apply per lane |
+| Route | How mail leaves: `self_hosted` (your MTA), `ses`, `sendgrid`, or a name under `routes`. Only `self_hosted` events feed the lanes; ESP routes get metrics and alerts only |
+| Target | The daily volume a lane grows toward: the source's target (`targets.sources.<name>.daily`, else `targets.default`) times the provider's share in `targets.mix`. A provider not in `mix` gets the whole unlisted remainder |
+| Limit | Messages the lane may send today, counted in first attempts. Retries do not count |
+| Warm source | A source listed in `targets.warm`. Its lanes start at their target |
+
+With `targets.default: 200000` and `mix: {gmail: 0.55, outlook: 0.20, yahoo: 0.10}`, every lane toward Gmail has a target of 110,000, and every lane toward another provider, such as `icloud`, 30,000. A source with no target is unmanaged: it gets metrics and alerts, and `/v1/limits` answers 404 with `managed: false`.
 
 ## Rules
 
@@ -52,6 +66,26 @@ With every day clean and fully used, a lane goes from 50 to 100,000 a day in 19 
 - A 404 with `managed: false` means the source has no target, the provider is unknown, or the source has neither a config entry nor a first event.
 
 The endpoint creates a lane for a source listed in `sources`, `targets.sources` or `targets.warm`. Any other source gets a lane with its first event, so a typo in a router does not create one.
+
+### From a sender
+
+Before each batch, for each provider in the batch:
+
+1. Ask every candidate source: `GET /v1/limits?provider=gmail` returns all lanes toward Gmail in one call.
+2. Give each source at most `floor(allowed_now)` messages. A source with 0 gets none.
+3. Put what no source can take back in the queue, or send it through an ESP route.
+4. Send, and let the adapters report the attempts. `sent` grows as the attempt events arrive, so ask again for the next batch instead of keeping a local count.
+
+The demo simulator (`internal/sim`) routes its traffic this way: it splits each provider's volume across sources in proportion to their limits, capped by `allowed_now`, and spreads the overflow over the sources with room left.
+
+A lane that just started on a new source has little room. On its first day toward Gmail, `limit` is 50 and the hourly limit is 50 / 16 = 3.125, so the lane may send 3 messages an hour. After those 3, `allowed_now` is 0.125, which rounds down to 0 until `next_hour_at`:
+
+```
+$ curl -s localhost:8080/v1/limits/mx-5/gmail
+{"source":"mx-5","provider":"gmail","managed":true,"state":"raising","reason":"new lane",
+ "allowed_now":0.125,"limit":50,"sent":3,"remaining":47,"target":110000,"day":0,
+ "hourly_limit":3.125,"sent_hour":3,"remaining_hour":0.125,"engaged_only":true,...}
+```
 
 ## States
 

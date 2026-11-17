@@ -20,8 +20,11 @@ From source, with Go 1.27 or later. Replace `<tag>` with a tag from the [release
 
 ```
 go install github.com/cauebraz/ehlo/cmd/ehlo@<tag>
+curl -fsSLO https://raw.githubusercontent.com/cauebraz/ehlo/<tag>/ehlo.example.yaml
 ehlo serve -config ehlo.example.yaml
 ```
+
+The release archives below also carry `ehlo.example.yaml`. [examples/systemd/ehlo.service](../examples/systemd/ehlo.service) runs the server under systemd.
 
 On Kubernetes, install the Helm chart: `helm install ehlo oci://ghcr.io/cauebraz/charts/ehlo --version <version>`. [kubernetes.md](kubernetes.md) covers the values.
 
@@ -49,6 +52,8 @@ The image also carries BuildKit provenance and SBOM attestations: `docker buildx
 
 ## Configure
 
+ehlo needs to know each sending server, called a source, and the daily volume it should reach. [limits.md](limits.md#terms) defines the terms.
+
 1. Set `targets.default` to the daily volume each server should reach. At the default 0, ehlo manages no lane.
 2. List your servers under `sources`.
 3. List servers that already have a reputation under `targets.warm`. Other servers start at 50 messages a day.
@@ -69,7 +74,7 @@ The image also carries BuildKit provenance and SBOM attestations: `docker buildx
 
 ## Ask before sending
 
-Call `GET /v1/limits/{source}/{provider}` and send up to `allowed_now`. See [limits.md](limits.md#api).
+ehlo does not hold mail back. To pace a warmup, the code that picks a source for each batch asks `GET /v1/limits?provider=<provider>`, gives each source at most `allowed_now` messages, and queues the rest or sends it through an ESP. [limits.md](limits.md#from-a-sender) shows the loop and every field. Skip this step to use ehlo for monitoring only.
 
 ## Monitor
 
@@ -79,17 +84,7 @@ Run one ehlo replica per warmup state: each process keeps its own lanes, so two 
 
 The dashboards use the Grafana dashboard schema v2 (`apiVersion: dashboard.grafana.app/v2`) and need Grafana 13 or later; the demo pins 13.3.1. Panels sit in auto grids that reflow on narrow screens, and each panel has a one-line subtitle under its title. The `monitoring` package generates the files; do not edit the JSON or the rules by hand.
 
-| Dashboard | Shows |
-|-----------|-------|
-| Overview | Email health in words (Healthy, Watch, Act now), delivery rate, complaints, delivery time, and what needs attention. The open alerts table hides while no alert is open. Each number links to the dashboard that explains it |
-| Warmup | Each lane's share of today's limit, its status, and the ramp |
-| Delivery | Why mail was not delivered, delivery time, mail waiting to retry. TLS in a collapsed row |
-| Reputation | Complaints, bounces, blocks, sender checks, own servers against ESPs. DMARC in a collapsed row |
-| Pipeline | Whether events still arrive |
-| Gmail, Microsoft, Yahoo | That provider's reply codes and published thresholds |
-| Reply codes | What each reply means and what to do |
-
-[dashboards.md](dashboards.md) has a screenshot of each one. [alerts.md](alerts.md) explains each alert.
+There are nine dashboards: Overview, Delivery, Reputation, Warmup, one each for Gmail, Microsoft and Yahoo, Reply codes, and Pipeline. [dashboards.md](dashboards.md) describes each one with a screenshot. [alerts.md](alerts.md) explains each alert.
 
 ## Security
 
