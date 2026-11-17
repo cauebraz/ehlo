@@ -65,8 +65,8 @@ The config file is decoded over the defaults, so a key set to zero stays zero. D
 ## Releases
 
 1. Move the Unreleased notes in `CHANGELOG.md` under the new version and date.
-2. Push a tag such as `v0.2.0` from `main`.
-3. The release workflow runs `scripts/check.sh`, pushes the multi-arch image to GHCR, builds the Helm chart (image pinned by digest), the monitoring bundle and the classic dashboards, builds archives, SBOMs and `checksums.txt` into a draft GitHub release, then pushes the chart to `oci://ghcr.io/cauebraz/charts` (the image goes first because the chart pins its digest), and attests the files, the image and the chart with GitHub build provenance.
+2. Push a tag such as `v0.2.0` from `main`. The workflow stops before publishing anything when the tag is not `vMAJOR.MINOR.PATCH[-PRERELEASE]` or its commit is not on `main`.
+3. The release workflow runs `scripts/check.sh`, the chart checks and a dry run of the release assets, then pushes the multi-arch image to GHCR as `X.Y.Z`, builds the Helm chart (image pinned by digest), the monitoring bundle and the classic dashboards, builds archives, SBOMs and `checksums.txt` into a draft GitHub release, then pushes the chart to `oci://ghcr.io/cauebraz/charts` (the image goes first because the chart pins its digest), and attests the files, the image and the chart with GitHub build provenance. The floating `X.Y` image tag moves last, after the chart and the draft release succeed, and never for a prerelease.
 4. Check the artifacts, then publish the draft.
 
 ## Security
