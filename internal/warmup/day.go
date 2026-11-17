@@ -68,7 +68,7 @@ func (p Policy) verdict(l *Lane, today, win dayStats) verdict {
 		return verdict{Holding, l.Limit, fmt.Sprintf("sent %.0f of %.0f yesterday, below %.0f%% of the limit", today.Sent, l.Limit, p.GrowWhenUsed*100), keep}
 	}
 	g := lookup(p.Growth, l.Provider)
-	return verdict{Raising, min(l.Target, max(l.Limit, today.Sent)*g), fmt.Sprintf("clean day, limit x%.2f", g), l.Limit}
+	return verdict{Raising, min(l.Target, l.Limit*g), fmt.Sprintf("clean day, limit x%.2f", g), l.Limit}
 }
 
 // closeDay applies the policy to one finished day of a lane. Complaint and

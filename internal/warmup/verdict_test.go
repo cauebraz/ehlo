@@ -47,7 +47,7 @@ func TestVerdict(t *testing.T) {
 		{"under-used", p, raising(100, 1000), dayStats{Sent: 69, Delivered: 69}, enough, Holding, 100, "sent 69 of 100 yesterday, below 70%"},
 		{"growth gmail", p, raising(100, 1000), dayStats{Sent: 70, Delivered: 70}, enough, Raising, 150, "clean day, limit x1.50"},
 		{"growth default provider", p, Lane{Provider: "corp.example", Limit: 100, Target: 1000, LastGood: 100, State: Raising}, dayStats{Sent: 100, Delivered: 100}, enough, Raising, 140, "limit x1.40"},
-		{"growth from sent above limit", p, Lane{Provider: "other", Limit: 100, Target: 1000, LastGood: 100, State: Raising}, dayStats{Sent: 120, Delivered: 120}, enough, Raising, 168, "limit x1.40"},
+		{"sending past the limit does not raise the growth base", p, Lane{Provider: "other", Limit: 100, Target: 1000, LastGood: 100, State: Raising}, dayStats{Sent: 1000, Delivered: 1000}, enough, Raising, 140, "limit x1.40"},
 		{"growth capped at target", p, raising(100, 130), dayStats{Sent: 100, Delivered: 100}, enough, Raising, 130, "clean day"},
 		{"growth on any day when grow_when_used is 0", p.With(func(p *Policy) { p.GrowWhenUsed = 0 }), raising(100, 1000), dayStats{Sent: 0}, dayStats{}, Raising, 150, "clean day"},
 	}

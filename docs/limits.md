@@ -13,15 +13,19 @@ ehlo keeps one lane per source and provider. Each lane has a daily limit that gr
 | Target | The daily volume a lane grows toward: the source's target (`targets.sources.<name>.daily`, else `targets.default`) times the provider's share in `targets.mix`. A provider not in `mix` gets the whole unlisted remainder |
 | Limit | Messages the lane may send today, counted in first attempts. Retries do not count |
 | Warm source | A source listed in `targets.warm`. Its lanes start at their target |
+| Clean day | A closed day that raises the limit: below the target, at least `grow_when_used` (70%) of the limit sent, and no pause, block, backoff, complaint hold or bounce hold |
+| Last good limit | The limit of the last clean day, or the target once reached. When a lane pauses, the limit of the day that paused it. Pauses and blocks resume at half of it |
 
 With `targets.default: 200000` and `mix: {gmail: 0.55, outlook: 0.20, yahoo: 0.10}`, every lane toward Gmail has a target of 110,000, and every lane toward another provider, such as `icloud`, 30,000. A source with no target is unmanaged: it gets metrics and alerts, and `/v1/limits` answers 404 with `managed: false`.
+
+The built-in provider names, as `GET /v1/limits/{source}/{provider}` and `?provider=` take them: `gmail`, `outlook`, `yahoo`, `icloud`, `comcast`, `spectrum`, `cox`, `orange`, `sfr`, `free`, `laposte`, `gmx`, `t-online`, `libero`, `mail.ru`, `yandex`, `seznam`, `proton`, `fastmail`, `zoho`, `qq`, `netease`, `naver`, `kakao`, `uol`, `terra`, `movistar` and `other`. `providers` and `providers_extra` change the set. A sender maps each recipient domain to one of these names the same way ehlo does; `internal/provider/provider.go` lists the domains.
 
 ## Rules
 
 | Condition | Effect |
 |-----------|--------|
 | New lane | Starts at `start_limit` (50). Starts at its target when the source is warm or the target is not above 50 |
-| Clean day, at least 70% of the limit sent | Limit grows: Gmail x1.5, Yahoo x1.35, Microsoft x1.3, others x1.4 |
+| Clean day, at least 70% of the limit sent | Limit grows: Gmail x1.5, Yahoo x1.35, Microsoft x1.3, others x1.4. Growth starts from the limit, so sending past it does not raise tomorrow's limit |
 | Complaints reach 0.1% of deliveries, or bounces 3% of first attempts | Limit holds |
 | Complaints reach 0.3% | Lane pauses for one day, then resumes at half its last good limit |
 | Rate limit replies reach 5% of attempts in 5 minutes | Lane stops for 10 minutes. Its hourly limit halves for the rest of the day |
