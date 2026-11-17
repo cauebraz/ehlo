@@ -269,7 +269,7 @@
               "transformations": []
             }
           },
-          "description": "Two meanings share this code: a recipient or domain policy refused the message, or Gmail judged it likely unsolicited.",
+          "description": "Three meanings share this code: a recipient or domain policy refused the message, Gmail judged it likely unsolicited, or Gmail blocked the IP for an unusual rate of unsolicited mail.",
           "id": 1006,
           "links": [],
           "title": "550 5.7.1 (gmail)",
@@ -287,7 +287,7 @@
                 "overrides": []
               },
               "options": {
-                "content": "**What it means.** Two meanings share this code: a recipient or domain policy refused the message, or Gmail judged it likely unsolicited.\n\n**What Google says.** For the policy variant, nothing to do on your side. For the unsolicited variant, review the content and the list.\n\n**What to do.** Check the reply text. The unsolicited variant on many recipients is a reputation problem and counts toward the block rule.\n\nCategory: `policy`. Back: use the browser back button or the dashboard list above.",
+                "content": "**What it means.** Three meanings share this code: a recipient or domain policy refused the message, Gmail judged it likely unsolicited, or Gmail blocked the IP for an unusual rate of unsolicited mail.\n\n**What Google says.** For the policy variant, nothing to do on your side. For the unsolicited and unusual rate variants, review the content, the list and the Gmail sender guidelines.\n\n**What to do.** Check the reply text. ehlo classifies the unsolicited and unusual rate variants as reputation_block and stops the lane for the day.\n\nCategory: `policy`. Back: use the browser back button or the dashboard list above.",
                 "mode": "markdown"
               }
             },

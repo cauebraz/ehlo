@@ -63,7 +63,7 @@ A tag is a provider token taken from the text when the event has none: `[TSS04]`
 |----------|----------|---------|
 | `delivered` | 250 | Accepted |
 | `rate_limited` | Gmail `4.7.28`, Microsoft `4.7.650` and `RP-001`, Yahoo `TSS04`, Comcast `RL000001`, Orange `OFR..._104`, NetEase `HL:ICC` | Slow down |
-| `reputation_block` | Microsoft `S3150`, `5.7.507` and `5.7.511`, Yahoo `TSS11`, Gmail `5.7.28`, Comcast `BL000001`, T-Online `(BL)`, "block list" or Spamhaus in a 5xx | IP or domain blocked |
+| `reputation_block` | Microsoft `S3150`, `5.7.507` and `5.7.511`, Yahoo `TSS11`, Gmail `5.7.28`, Comcast `BL000001`, T-Online `(BL)`, "block list", Spamhaus or "unusual rate" in a 5xx | IP or domain blocked |
 | `auth_failure` | Microsoft `5.7.515` and `5.7.509`, Gmail `5.7.26` and `4.7.29`, Comcast `DM000001`, Orange `OFR..._515` | SPF, DKIM, DMARC, TLS or PTR failed |
 | `invalid_recipient` | `5.1.1` | Address does not exist |
 | `mailbox_full` | `4.2.2` | Mailbox over quota |

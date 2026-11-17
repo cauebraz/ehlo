@@ -62,8 +62,8 @@ var rules = []rule{
 	{cat: RateLimited, enhanced: re(`^4\.7\.(28|650|651|652)$`)},
 	{cat: RateLimited, enhanced: re(`^5\.7\.508$`)},
 	{cat: RateLimited, tag: re(`^(TSS?0[124]|RP-00[1-3]|S775|RL0000\d*|AUP#IN-13\d\d|AUP#CXCNCT|AUP#CXMXRT|OFR\d{3}_(104|109|98[89]|99\d)|HL:I[CF]C|MI:(CEL|DMC|SFQ)|LPN\d{3}_4\d\d)$`)},
-	{cat: RateLimited, text: re(`(?i)rate limit|unusual rate|too many (connections|messages|emails|recipients|mails|mail)|temporarily deferred due to (unexpected volume|user complaints)|frequency limited|parallel connections|exceeded permitted limits|thread limit exceeded|slow down`)},
-	{cat: RateLimited, text: re(`(?i)low reputation`), temporary: true},
+	{cat: RateLimited, text: re(`(?i)rate limit|too many (connections|messages|emails|recipients|mails|mail)|temporarily deferred due to (unexpected volume|user complaints)|frequency limited|parallel connections|exceeded permitted limits|thread limit exceeded|slow down`)},
+	{cat: RateLimited, text: re(`(?i)low reputation|unusual rate`), temporary: true},
 	// Authentication: SPF, DKIM, DMARC, TLS or reverse DNS failed.
 	{cat: AuthFailure, enhanced: re(`^[45]\.7\.(23|25|26|27|29|30|32|40|506|509|515)$`)},
 	{cat: AuthFailure, tag: re(`^(DM\d{6}|ES\d{6}|OFR\d{3}_(107|20\d|39[78]|515|519|535)|LPN\d{3}_401|MI:(SPF|NHD))$`)},
@@ -71,7 +71,7 @@ var rules = []rule{
 	// Reputation: the provider blocked the IP or domain.
 	{cat: ReputationBlock, enhanced: re(`^5\.7\.(28|507|511|513|60[6-9]|6[1-4]\d|705|708)$`)},
 	{cat: ReputationBlock, tag: re(`^(S3140|S3150|TSS?03|TSS09|TSS11|SC-00[1-4]|DY-00[12]|OU-00[12]|CS0\d|BL\d{6}|AUP#IN-1000|AUP#IN-1370|AUP#CXBL|IPBL\d*|OFR\d{3}_(99|10[0-3]|425|506)|LPN\d{3}_102|HL:(IPB|IHU)|DT:RBL|GU_EIB_\d+|SFR_IN_\d+|\(BL\))$`)},
-	{cat: ReputationBlock, text: re(`(?i)block ?list|blacklist|spamhaus|dnsbl|\brbl\b|unsolicited|likely spam|suspected spam|banned|permanently deferred|spam message rejected|too many spams|\(bl\)|low reputation|blocked for user complaints`), permanent: true},
+	{cat: ReputationBlock, text: re(`(?i)block ?list|blacklist|spamhaus|dnsbl|\brbl\b|unsolicited|likely spam|suspected spam|banned|permanently deferred|spam message rejected|too many spams|\(bl\)|low reputation|unusual rate|blocked for user complaints`), permanent: true},
 	// Recipient: the address does not exist or refuses the sender.
 	{cat: InvalidRecipient, enhanced: re(`^5\.(1\.[1-9][0-9]*|2\.1|4\.1)$`)},
 	{cat: InvalidRecipient, tag: re(`^OFR\d{3}_416$`)},
