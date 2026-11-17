@@ -4,7 +4,7 @@ ehlo learns about your mail only through events. The adapters in [integrations.m
 
 `POST /v1/events` takes one JSON object, a JSON array, or one object per line. It answers 202 with `accepted`, `invalid` and the first ten errors, each with the event's index. It answers 400 when no event was accepted, including an empty array. Each reported error is at most 256 bytes.
 
-A request carries at most 10,000 events; more get 413. A body that is not valid JSON, or has more than 10,000 events, records none of them. The SendGrid webhook has the same 10,000-element limit. The KumoMTA webhook takes at most 10,000 records per request and 10,000 recipients per record, and the records may give at most 10,000 events in total; a request over any of these gets 413 and records nothing.
+A request carries at most 10,000 events; more get 413. A body that is not valid JSON, or has more than 10,000 events, records none of them. The SendGrid webhook has the same 10,000-element limit. An SES notification may list at most 10,000 recipients. The KumoMTA webhook takes at most 10,000 records per request and 10,000 recipients per record, and the records may give at most 10,000 events in total; a request over any of these gets 413 and records nothing.
 
 Every `POST` endpoint, webhooks included, answers 403 to a cross-origin browser request (a `Sec-Fetch-Site` of `cross-site` or `same-site`, or an `Origin` whose host differs from `Host`). MTAs, scripts and ESPs send neither header and pass. A request line and headers over 64 KiB (65,536 bytes) get 431.
 

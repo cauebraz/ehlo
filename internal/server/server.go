@@ -158,6 +158,9 @@ func (s *Server) webhook(parse esp.Parser, check precheck) http.HandlerFunc {
 			return
 		}
 		events, err := parse(body, s.now())
+		if err == nil && len(events) > event.MaxBatch {
+			err = event.ErrBatchTooLarge
+		}
 		if err != nil {
 			http.Error(w, err.Error(), statusFor(err))
 			return
