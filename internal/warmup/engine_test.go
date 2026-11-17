@@ -345,6 +345,18 @@ func TestHourlyLimitOnlyWhileWarming(t *testing.T) {
 	}
 }
 
+func TestBackoffCapsTheHourAtTarget(t *testing.T) {
+	e, c := newEngine(t, Targets{Default: 1000, Warm: []string{"mx-1"}})
+	feed(e, attempt("mx-1", "other", 100))
+	feed(e, reply("mx-1", "other", 250, 90))
+	feed(e, throttle("mx-1", "other", 10))
+	c.add(11 * time.Minute)
+	d := e.Decide("mx-1", "other")
+	if want := 1000.0 / 16 / 2; d.State != AtTarget || math.Abs(d.HourlyLimit-want) > 1e-9 {
+		t.Errorf("lane at target after a backoff = %s hourly %v, want at_target with %v (limit / hours_per_day, halved)", d.State, d.HourlyLimit, want)
+	}
+}
+
 func TestIdleReset(t *testing.T) {
 	e, c := newEngineWith(t, func(p *Policy) { p.IdleDaysReset = 3 }, Targets{Default: 100_000, Warm: []string{"idle"}})
 	e.Decide("idle", "gmail")

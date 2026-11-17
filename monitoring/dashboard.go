@@ -132,7 +132,7 @@ func warmupDashboard() Dashboard {
 		{Title: "During the day", Groups: []Group{charts(3,
 			Panel{Type: "timeseries", Title: "Hourly allowance", Unit: "short",
 				Subtitle:    "Emails each server may send this hour",
-				Description: "Emails each warming server may send per hour toward each provider. It halves for the rest of the day after the provider asks to slow down. A fully warmed server has no hourly cap and shows its daily limit.",
+				Description: "Emails each warming server may send per hour toward each provider. It halves for the rest of the day after the provider asks to slow down. A fully warmed server has no hourly cap and shows its daily limit until a slow-down reply; then it gets the warming cap, halved.",
 				Queries:     []Query{{Expr: `max by (source, provider) (ehlo_warmup_hourly_limit_messages{` + both + `})`, Legend: "{{source}} to {{provider}}"}}},
 			Panel{Type: "timeseries", Title: "Slowdowns today", Unit: "short",
 				Subtitle:    "Each one stops tomorrow's growth",

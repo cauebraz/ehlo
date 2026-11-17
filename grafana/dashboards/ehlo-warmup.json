@@ -274,7 +274,7 @@
               "transformations": []
             }
           },
-          "description": "Emails each warming server may send per hour toward each provider. It halves for the rest of the day after the provider asks to slow down. A fully warmed server has no hourly cap and shows its daily limit.",
+          "description": "Emails each warming server may send per hour toward each provider. It halves for the rest of the day after the provider asks to slow down. A fully warmed server has no hourly cap and shows its daily limit until a slow-down reply; then it gets the warming cap, halved.",
           "id": 3,
           "links": [],
           "subtitle": "Emails each server may send this hour",

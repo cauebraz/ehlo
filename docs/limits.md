@@ -37,7 +37,7 @@ With every day clean and fully used, a lane goes from 50 to 100,000 a day in 19 
 - A day starts at `decision_hour` UTC on the server clock. Event timestamps never move it. With `day_length` under 24h, days are `day_length` slots from the Unix epoch and `decision_hour` is ignored.
 - An hour is `day_length / 24`, counted from the day start.
 - Below its target, a lane may send `limit / hours_per_day` per hour. The default 16 allows 1.5x the flat rate.
-- At its target, a lane has no hourly limit until a backoff halves it.
+- At its target, a lane has no hourly limit until a backoff. From then until the end of the day, its hourly limit is `limit / hours_per_day`, halved once per backoff, as below the target.
 
 ## API
 

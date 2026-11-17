@@ -151,8 +151,8 @@ func compareDecisions(a, b Decision) int {
 // stored, so a scrape or a limits query never writes.
 func (p Policy) decision(l *Lane, now time.Time) Decision {
 	hourStart, sentHour := p.hourView(l, now)
-	hourly := l.Limit * l.HourlyFactor
-	if l.Limit < l.Target {
+	hourly := l.Limit
+	if l.Limit < l.Target || l.HourlyFactor < 1 {
 		hourly = l.Limit / float64(p.HoursPerDay) * l.HourlyFactor
 	}
 	remaining := max(0, l.Limit-l.Sent)
