@@ -59,6 +59,32 @@ func TestWebhookToken(t *testing.T) {
 	}
 }
 
+func TestWebhookTokenInAuthorizationHeader(t *testing.T) {
+	h := newWebhookServer(t, WithWebhookToken("s3cret"))
+	basic := func(user, pass string) string {
+		return "Basic " + base64.StdEncoding.EncodeToString([]byte(user+":"+pass))
+	}
+	for auth, want := range map[string]int{
+		"Bearer s3cret":        http.StatusAccepted,
+		"bearer s3cret":        http.StatusAccepted,
+		"Bearer wrong":         http.StatusUnauthorized,
+		basic("sns", "s3cret"): http.StatusAccepted,
+		basic("", "s3cret"):    http.StatusAccepted,
+		basic("s3cret", "x"):   http.StatusUnauthorized,
+		"Basic not-base64!":    http.StatusUnauthorized,
+		"Token s3cret":         http.StatusUnauthorized,
+	} {
+		rec := postWith(h, "/v1/webhooks/sendgrid", sendgridBody, http.Header{"Authorization": {auth}})
+		if rec.Code != want {
+			t.Errorf("Authorization %q = %d, want %d", auth, rec.Code, want)
+		}
+	}
+	rec := postWith(h, "/v1/webhooks/ses", "{}", nil)
+	if got := rec.Header().Get("WWW-Authenticate"); rec.Code != http.StatusUnauthorized || got != `Basic realm="ehlo"` {
+		t.Errorf("no credentials = %d with WWW-Authenticate %q, want 401 with a Basic challenge", rec.Code, got)
+	}
+}
+
 func TestSendGridSignature(t *testing.T) {
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {

@@ -153,7 +153,7 @@ Top level:
 | `providers_extra` | | Rules added after `providers` or the built-in list. For a domain or suffix both list, this one wins. Each rule needs a `name` (1-32 letters, digits, `.`, `_` or `-`) and at least one domain; a leading dot matches the domain and its subdomains. Use it for Google Workspace or Microsoft 365 tenants, which the built-in list maps to `other` |
 | `routes` | | Routes accepted besides `self_hosted`, `ses` and `sendgrid` |
 | `max_sources` | 256 | Distinct sources accepted. Events from further sources are rejected |
-| `webhooks.token` | | Every webhook request must carry `?token=<value>` |
+| `webhooks.token` | | Every webhook request must carry the token: `?token=<value>`, `Authorization: Bearer <value>`, or HTTP Basic with the token as password |
 | `webhooks.sendgrid_public_key` | | The SendGrid webhook must carry a valid signature. Base64 key from SendGrid's Signed Event Webhook settings |
 | `webhooks.token_file` | | File whose content, trimmed of surrounding whitespace, is `webhooks.token`, such as a mounted Kubernetes Secret key. Read once at start. Setting it with `webhooks.token`, or naming an unreadable or empty file, fails the start |
 | `webhooks.sendgrid_public_key_file` | | The same for `webhooks.sendgrid_public_key` |

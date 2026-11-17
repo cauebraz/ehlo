@@ -90,4 +90,4 @@ There are nine dashboards: Overview, Delivery, Reputation, Warmup, one each for 
 
 `/v1/events` and `/v1/limits` have no authentication. Keep them on a private network or behind a proxy that checks callers.
 
-Expose only `/v1/webhooks/` to the internet. Set `webhooks.token` (or `webhooks.token_file`), add `?token=<value>` to every webhook URL (SES, SendGrid, KumoMTA), and set `webhooks.sendgrid_public_key` (or `webhooks.sendgrid_public_key_file`). See [SECURITY.md](../SECURITY.md).
+Expose only `/v1/webhooks/` to the internet. Set `webhooks.token` (or `webhooks.token_file`), send it with every webhook request (SES, SendGrid, KumoMTA) as `?token=<value>`, as `Authorization: Bearer <value>`, or as the password of HTTP Basic authentication; the header keeps it out of proxy access logs, and set `webhooks.sendgrid_public_key` (or `webhooks.sendgrid_public_key_file`). See [SECURITY.md](../SECURITY.md).

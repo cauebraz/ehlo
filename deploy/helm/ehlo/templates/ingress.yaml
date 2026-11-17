@@ -1,0 +1,36 @@
+{{- if .Values.webhookIngress.enabled }}
+{{- if not .Values.webhookIngress.host }}
+{{- fail "webhookIngress.host is required when webhookIngress.enabled is true" }}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "ehlo.fullname" . }}-webhooks
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ehlo.labels" . | nindent 4 }}
+  {{- with .Values.webhookIngress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.webhookIngress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.webhookIngress.tlsSecretName }}
+  tls:
+    - hosts: [{{ $.Values.webhookIngress.host | quote }}]
+      secretName: {{ . }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.webhookIngress.host | quote }}
+      http:
+        paths:
+          - path: /v1/webhooks/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "ehlo.fullname" . }}
+                port:
+                  name: http
+{{- end }}

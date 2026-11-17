@@ -59,7 +59,7 @@ existingConfigSecret: ehlo-config
 existingConfigSecretKey: ehlo.yaml
 ```
 
-With `existingConfigSecret` the chart ignores `config`, and rendering fails when `webhookSecret.name` is also set: the chart cannot add `webhooks.token_file` to a file it does not render, so put the webhook credentials in the config Secret. The file must omit `listen` or set it to `:8080`; the chart passes `-state /data/warmup.json`, which overrides `state_path`. A change to the Secret takes effect after `kubectl -n ehlo rollout restart deployment/ehlo`. With External Secrets Operator, a template can build the file from the token in your secret store. Expose only `/v1/webhooks/` outside the cluster; [SECURITY.md](../SECURITY.md) explains why.
+With `existingConfigSecret` the chart ignores `config`, and rendering fails when `webhookSecret.name` is also set: the chart cannot add `webhooks.token_file` to a file it does not render, so put the webhook credentials in the config Secret. The file must omit `listen` or set it to `:8080`; the chart passes `-state /data/warmup.json`, which overrides `state_path`. A change to the Secret takes effect after `kubectl -n ehlo rollout restart deployment/ehlo`. With External Secrets Operator, a template can build the file from the token in your secret store. Expose only `/v1/webhooks/` outside the cluster, for example with `webhookIngress`; [SECURITY.md](../SECURITY.md) explains why. `networkPolicy` keeps the other endpoints to the peers you list.
 
 ## kube-prometheus-stack
 
@@ -128,6 +128,8 @@ Without a local mimirtool: `docker run --rm -v "$PWD/mimir:/rules:ro" grafana/mi
 | `config` | `sources: []`, `targets.default: 0` | `ehlo.yaml` |
 | `existingConfigSecret`, `existingConfigSecretKey` | `""`, `ehlo.yaml` | Secret with the whole config, replaces `config` |
 | `webhookSecret.name`, `.tokenKey`, `.sendgridPublicKeyKey` | `""`, `token`, `""` | Secret mounted at `/etc/ehlo-secrets`; sets `webhooks.token_file` and `webhooks.sendgrid_public_key_file`; not allowed with `existingConfigSecret` |
+| `webhookIngress.enabled`, `.host`, `.className`, `.tlsSecretName`, `.annotations` | `false`, `""` | Ingress for `/v1/webhooks/` only; `host` is required when enabled |
+| `networkPolicy.enabled`, `.from` | `false`, `[]` | NetworkPolicy that admits only the listed peers to the HTTP port; with no peers it denies all ingress. List Prometheus, the senders, the log tailers and the ingress controller |
 | `persistence.enabled`, `.size`, `.storageClassName`, `.existingClaim` | `true`, `1Gi` | Volume for `/data` |
 | `resources` | 50m CPU and 64Mi requested, 256Mi memory limit | |
 | `serviceMonitor.enabled`, `podMonitor.enabled` | `false` | Enable one; the chart fails when both are on |

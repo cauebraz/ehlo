@@ -1,0 +1,17 @@
+webhookIngress:
+  enabled: true
+  className: nginx
+  host: ehlo.example.com
+  tlsSecretName: ehlo-example-tls
+networkPolicy:
+  enabled: true
+  from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: mta

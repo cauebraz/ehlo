@@ -56,7 +56,9 @@ const (
 	sendGridTimestamp = "X-Twilio-Email-Event-Webhook-Timestamp"
 )
 
-// WithWebhookToken requires the token query parameter on every webhook.
+// WithWebhookToken requires the token on every webhook, as the token query
+// parameter, an Authorization Bearer token, or the password of HTTP Basic
+// authentication (the form SNS sends for https://user:token@host URLs).
 func WithWebhookToken(token string) Option { return func(s *Server) { s.token = token } }
 
 // WithSendGridKey requires a valid SendGrid signature on its webhook.
@@ -145,9 +147,28 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 // and returns true when the request is fully handled.
 type precheck func(w http.ResponseWriter, r *http.Request, body []byte) bool
 
+func (s *Server) tokenOK(r *http.Request) bool {
+	if q := r.URL.Query().Get("token"); q != "" {
+		return s.tokenEquals(q)
+	}
+	auth := r.Header.Get("Authorization")
+	if scheme, value, ok := strings.Cut(auth, " "); ok && strings.EqualFold(scheme, "Bearer") {
+		return s.tokenEquals(value)
+	}
+	if _, pass, ok := r.BasicAuth(); ok {
+		return s.tokenEquals(pass)
+	}
+	return false
+}
+
+func (s *Server) tokenEquals(got string) bool {
+	return subtle.ConstantTimeCompare([]byte(got), []byte(s.token)) == 1
+}
+
 func (s *Server) webhook(parse esp.Parser, check precheck) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if s.token != "" && subtle.ConstantTimeCompare([]byte(r.URL.Query().Get("token")), []byte(s.token)) != 1 {
+		if s.token != "" && !s.tokenOK(r) {
+			w.Header().Set("WWW-Authenticate", `Basic realm="ehlo"`)
 			http.Error(w, "invalid or missing token", http.StatusUnauthorized)
 			return
 		}

@@ -67,6 +67,25 @@ service:
   annotations: {}
   labels: {}
 
+# Exposes only /v1/webhooks/ (SES, SendGrid, KumoMTA) through an Ingress.
+# /v1/events, /v1/limits and /metrics have no authentication and stay
+# inside the cluster. Set webhookSecret too.
+webhookIngress:
+  enabled: false
+  className: ""
+  host: ""
+  # Secret with the TLS certificate for host. Empty serves no TLS block.
+  tlsSecretName: ""
+  annotations: {}
+
+# Limits ingress to the HTTP port to the listed peers (NetworkPolicyPeer
+# entries): Prometheus, the senders that query /v1/limits, the MTA log
+# tailers and the ingress controller. Enabled with no peers, it denies all
+# ingress.
+networkPolicy:
+  enabled: false
+  from: []
+
 podAnnotations: {}
 podLabels: {}
 

@@ -88,7 +88,7 @@ The field mapping follows the PowerMTA 5.0 User's Guide and is not verified agai
 ## Amazon SES
 
 1. Create an SNS topic and set it as the destination of a configuration set's event publishing (or of identity notifications).
-2. Subscribe `https://<ehlo>/v1/webhooks/ses?token=<token>` over HTTPS.
+2. Subscribe `https://<ehlo>/v1/webhooks/ses?token=<token>` over HTTPS. `https://sns:<token>@<ehlo>/v1/webhooks/ses` uses the HTTP Basic authentication SNS supports for HTTPS endpoints instead, which keeps the token out of the request line and so out of access logs. ehlo answers a request without the token with 401 and a `WWW-Authenticate: Basic` challenge, which SNS requires for this form.
 3. ehlo logs the `subscribe_url`; open it or paste it in the SNS console to confirm.
 
 ## SendGrid
