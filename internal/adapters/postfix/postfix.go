@@ -36,7 +36,6 @@ var (
 	remoteRe   = regexp.MustCompile(`(?:said|refused to talk to me): [245]\d\d[ -]`)
 	rfc5424Re  = regexp.MustCompile(`^<\d{1,3}>1 (\S+) (\S+) (\S+) (\S+) \S+ (?:-|\[.*?\]) (.*)$`)
 	priRe      = regexp.MustCompile(`^<\d{1,3}>`)
-	tlsRe      = regexp.MustCompile(daemon + `(?:SSL_connect error to|Cannot start TLS)`)
 	syslogTime = regexp.MustCompile(`^(\w{3} {1,2}\d{1,2} \d{2}:\d{2}:\d{2})\s`)
 	isoTime    = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:?\d{2}))\s`)
 )
@@ -55,7 +54,6 @@ var (
 	tlsSvcGroup  = tlsOKRe.SubexpIndex("svc")
 	trustGroup   = tlsOKRe.SubexpIndex("trust")
 	versionGroup = tlsOKRe.SubexpIndex("version")
-	tlsErrSvc    = tlsRe.SubexpIndex("svc")
 )
 
 // Parser keeps the source identity and the clock a log line lacks. The zero
@@ -164,11 +162,6 @@ func (p *Parser) Parse(line string) []event.Event {
 		}
 		return []event.Event{tls}
 	}
-	if m := tlsRe.FindStringSubmatch(line); m != nil && !localService[m[tlsErrSvc]] {
-		reply := base
-		reply.Type, reply.Stage = event.Reply, event.StageTLS
-		return []event.Event{reply}
-	}
 	return nil
 }
 
@@ -184,6 +177,14 @@ func (p *Parser) delivery(m []string, base event.Event) []event.Event {
 	dsn, text := m[dsnGroup], m[textGroup]
 
 	base.Domain = strings.ToLower(m[domainGroup])
+	if local(m[relayGroup], text) {
+		if m[statusGroup] != "bounced" {
+			return nil
+		}
+		bounce := base
+		bounce.Type, bounce.Bounce = event.Bounce, bounceKind(dsn, classify.Classify(classify.Reply{Code: codeFor(dsn, text), Enhanced: dsn, Text: text}))
+		return []event.Event{bounce}
+	}
 	attempt := base
 	attempt.Type, attempt.Attempt = event.Attempt, event.First
 	if p.retry(m[idGroup]+"|"+strings.ToLower(m[rcptGroup]), before) {
@@ -222,6 +223,17 @@ func (p *Parser) delivery(m []string, base event.Event) []event.Event {
 		return []event.Event{attempt, reply, bounce}
 	}
 	return nil
+}
+
+// local reports a failure Postfix raised before any SMTP session, such as a
+// resolver error or a mail loop: no relay, no remote reply and no
+// connection failure. It says nothing about the provider.
+func local(relay, text string) bool {
+	if relay != "none" || remoteRe.MatchString(text) {
+		return false
+	}
+	_, conn := connectionStage(text)
+	return !conn
 }
 
 func truncate(s string) string {

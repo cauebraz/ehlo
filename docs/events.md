@@ -52,6 +52,8 @@ Every `POST` endpoint, webhooks included, answers 403 to a cross-origin browser 
 - Lines from `lmtp`, `local`, `virtual`, `pipe`, `discard`, `error` and `retry` are skipped. None of them talks to a provider.
 - Lines whose relay is listed in `-skip-relay` are skipped, so a smarthost's 250 is not counted as the provider's.
 - A greeting refusal (`refused to talk to me: 554 ...`) keeps the provider's code and counts as a connection failure.
+- A failure Postfix raises before any SMTP session (`relay=none` with no remote reply and no connection error, such as a resolver error or `loops back to myself`) gives no attempt and no reply, because it says nothing about the provider. A `bounced` one still gives the bounce. The next attempt of that message counts as `first` unless it waited at least `-retry-after`.
+- A failed TLS handshake counts once, from the delivery line (`Cannot start TLS: handshake failure`) as a `tls` stage reply toward the recipient's provider. The `SSL_connect error` line before it gives no event.
 - RFC 3164 and RFC 5424 lines are read. Lines over 1 MiB are skipped and logged.
 - RFC 3164 timestamps carry no zone. `-tz` sets it; the default is the tailer's local zone.
 - A batch the server refuses with 400, 415 or 422 is logged and dropped, not resent. A batch that gets 413 is split in half until it fits, and an event too large on its own is dropped. Any other answer, including 401, 403 and 404 from a proxy or a wrong `-target`, keeps the batch for the next flush.

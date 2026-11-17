@@ -126,9 +126,38 @@ func TestTLSLines(t *testing.T) {
 	if len(got) != 1 || got[0].Type != event.TLS || got[0].TLSVersion != "TLSv1.3" || got[0].TLSTrust != "untrusted" {
 		t.Errorf("tls established events = %+v", got)
 	}
-	got = parser().Parse(`2026-03-10T08:19:00.123456+00:00 mx-1 postfix/smtp[2261]: SSL_connect error to mx.example.com[203.0.113.11]:25: -1`)
-	if len(got) != 1 || got[0].Stage != event.StageTLS || !got[0].Time.Equal(time.Date(2026, 3, 10, 8, 19, 0, 123456000, time.UTC)) {
-		t.Errorf("tls failure events = %+v", got)
+}
+
+func TestTLSHandshakeFailureCountsOnce(t *testing.T) {
+	p := parser()
+	if got := p.Parse(`Mar 10 08:19:00 mx-1 postfix/smtp[116]: SSL_connect error to gmail-smtp-in.l.google.com[203.0.113.26]:25: -1`); len(got) != 0 {
+		t.Errorf("SSL_connect error line = %+v, want nil: the delivery line that follows records the failure", got)
+	}
+	got := p.Parse(`Mar 10 08:19:00 mx-1 postfix/smtp[116]: 6EF9068F095: to=<user1@gmail.com>, relay=gmail-smtp-in.l.google.com[203.0.113.26]:25, delay=0.02, delays=0.01/0.01/0/0, dsn=4.7.5, status=deferred (Cannot start TLS: handshake failure)`)
+	if len(got) != 2 || got[1].Type != event.Reply || got[1].Stage != event.StageTLS || got[1].Domain != "gmail.com" || got[1].Code != 0 {
+		t.Errorf("handshake failure delivery line = %+v, want an attempt and one tls reply toward gmail.com", got)
+	}
+}
+
+func TestLocalFailuresAreNotProviderReplies(t *testing.T) {
+	p := parser()
+	dns := `Mar 10 08:19:00 mx-1 postfix/smtp[120]: 709EB68F098: to=<user1@gmail.com>, relay=none, delay=0.01, delays=0/0.01/0/0, dsn=4.4.3, status=deferred (Host or domain name not found. Name service error for name=gmail.com type=MX: Host not found, try again)`
+	if got := p.Parse(dns); len(got) != 0 {
+		t.Errorf("resolver failure = %+v, want nil: no session reached the provider", got)
+	}
+	sent := p.Parse(`Mar 10 08:29:00 mx-1 postfix/smtp[121]: 709EB68F098: to=<user1@gmail.com>, relay=gmail-smtp-in.l.google.com[203.0.113.26]:25, delay=600, delays=599/0.5/0.2/0.3, dsn=2.0.0, status=sent (250 2.0.0 OK)`)
+	if len(sent) == 0 || sent[0].Attempt != event.Retry {
+		t.Errorf("delivery after a local deferral = %+v, want counted (retry by queue age)", sent)
+	}
+	loop := `Mar 10 08:19:00 mx-1 postfix/smtp[122]: 709EB68F099: to=<user2@example.org>, relay=none, delay=0.01, delays=0/0.01/0/0, dsn=5.4.6, status=bounced (mail for example.org loops back to myself)`
+	got := p.Parse(loop)
+	if len(got) != 1 || got[0].Type != event.Bounce {
+		t.Errorf("local bounce = %+v, want only the bounce", got)
+	}
+	first := p.Parse(`Mar 10 08:19:01 mx-1 postfix/smtp[123]: 709EB68F09A: to=<user3@gmail.com>, relay=none, delay=0.01, delays=0/0.01/0/0, dsn=4.4.3, status=deferred (Host or domain name not found. Name service error for name=gmail.com type=MX: Host not found, try again)`)
+	again := p.Parse(`Mar 10 08:19:30 mx-1 postfix/smtp[124]: 709EB68F09A: to=<user3@gmail.com>, relay=gmail-smtp-in.l.google.com[203.0.113.26]:25, delay=30, delays=29/0.5/0.2/0.3, dsn=2.0.0, status=sent (250 2.0.0 OK)`)
+	if len(first) != 0 || len(again) == 0 || again[0].Attempt != event.First {
+		t.Errorf("local deferral then delivery = %+v then %+v, want nothing then a first attempt", first, again)
 	}
 }
 
