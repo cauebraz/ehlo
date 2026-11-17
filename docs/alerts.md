@@ -75,7 +75,7 @@ Find the campaign, clean the list, and suppress an address on its first hard bou
 
 ## EhloFeedbackFeedStale
 
-Warning. A route keeps sending (attempts or deliveries in the last 30 minutes), but no complaint or bounce event arrived for 30 minutes. A webhook or feedback loop stopped. A route that never received a complaint or bounce event has no last-event time, so this alert cannot fire for it. Until it is fixed, the complaint ratio reads zero and the warmup engine counts the day as clean.
+Warning. A route keeps sending (attempts or deliveries in the last 30 minutes), but no complaint or bounce event arrived for 30 minutes. A webhook or feedback loop stopped. A route that never received a complaint or bounce event has no last-event time, so this alert cannot fire for it. The last-event time comes from the last day of samples, so the alert survives an ehlo restart and stops a day after the last event. Until it is fixed, the complaint ratio reads zero and the warmup engine counts the day as clean.
 
 Fix the feed before the day ends.
 

@@ -224,7 +224,7 @@
                       "group": "prometheus",
                       "kind": "DataQuery",
                       "spec": {
-                        "expr": "time() - max by (route, type) (ehlo_route_last_event_timestamp_seconds{type=~\"complaint|bounce|open\"})",
+                        "expr": "time() - max by (route, type) (max_over_time(ehlo_route_last_event_timestamp_seconds{type=~\"complaint|bounce|open\"}[1d]))",
                         "instant": true,
                         "legendFormat": "{{route}} {{type}}",
                         "range": false

@@ -74,7 +74,7 @@ sum by (route) (rate(ehlo_smtp_attempts_total{attempt="first"}[10m]))`},
 sum by (source, provider) (rate(ehlo_smtp_attempts_total{route="self_hosted"}[10m]))`},
 		{Record: "ehlo:hard_bounce:ratio_rate10m", Expr: `sum by (route, source, provider) (rate(ehlo_bounces_total{kind="hard"}[10m]))
   / sum by (route, source, provider) (rate(ehlo_smtp_attempts_total{attempt="first"}[10m]))`},
-		{Record: "ehlo:feed_age_seconds", Expr: `time() - max by (route, type) (ehlo_route_last_event_timestamp_seconds)`},
+		{Record: "ehlo:feed_age_seconds", Expr: `time() - max by (route, type) (max_over_time(ehlo_route_last_event_timestamp_seconds[1d]))`},
 	}}
 }
 

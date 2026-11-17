@@ -46,4 +46,4 @@ groups:
           sum by (route, source, provider) (rate(ehlo_bounces_total{kind="hard"}[10m]))
             / sum by (route, source, provider) (rate(ehlo_smtp_attempts_total{attempt="first"}[10m]))
       - record: ehlo:feed_age_seconds
-        expr: time() - max by (route, type) (ehlo_route_last_event_timestamp_seconds)
+        expr: time() - max by (route, type) (max_over_time(ehlo_route_last_event_timestamp_seconds[1d]))

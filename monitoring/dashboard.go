@@ -307,7 +307,7 @@ func pipelineDashboard() Dashboard {
 				Panel{Type: "bargauge", Title: "Time since last event", Unit: "s", Min: ptr(0.0), Max: ptr(3600.0),
 					Subtitle:    "Past 30 minutes the feed has probably stopped",
 					Description: "Time since the last complaint, bounce and open event for each way of sending. Past 30 minutes while email keeps going out, the feed has probably stopped, and ehlo would read the silence as a clean day.",
-					Queries:     []Query{{Expr: `time() - max by (route, type) (ehlo_route_last_event_timestamp_seconds{type=~"complaint|bounce|open"})`, Legend: "{{route}} {{type}}", Instant: true}},
+					Queries:     []Query{{Expr: `time() - max by (route, type) (max_over_time(ehlo_route_last_event_timestamp_seconds{type=~"complaint|bounce|open"}[1d]))`, Legend: "{{route}} {{type}}", Instant: true}},
 					Thresholds:  steps("green", at(1800, "yellow"))},
 			),
 		}},

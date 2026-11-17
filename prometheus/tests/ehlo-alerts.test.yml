@@ -489,6 +489,28 @@ tests:
               runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlofeedbackfeedstale
               dashboard_uid: ehlo-pipeline
 
+  - name: a feedback feed that stopped before an ehlo restart still alerts
+    interval: 1m
+    input_series:
+      - series: 'ehlo_route_last_event_timestamp_seconds{route="ses", type="complaint", instance="ehlo:8080"}'
+        values: '0+60x10 stale'
+      - series: 'ehlo_smtp_attempts_total{route="ses", source="ses", provider="gmail", attempt="first", instance="ehlo:8080"}'
+        values: '0+100x60'
+    alert_rule_test:
+      - eval_time: 46m
+        alertname: EhloFeedbackFeedStale
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: warning
+              route: ses
+              type: complaint
+            exp_annotations:
+              summary: No complaint event on route ses for 36m 0s while it keeps sending
+              description: "A webhook or feedback loop probably stopped. Until it is fixed, the complaint rate reads zero and the warmup engine counts the day as clean. First check the adapter that sends complaint events for route ses."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlofeedbackfeedstale
+              dashboard_uid: ehlo-pipeline
+
   - name: connection failures above half of the attempts
     interval: 15s
     input_series:

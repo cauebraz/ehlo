@@ -619,7 +619,7 @@ var gaugeRe = regexp.MustCompile(`\b(ehlo_queue_[a-z_]+|ehlo_warmup_[a-z_]+|ehlo
 
 // replicaSafeBefore matches what may come right before a gauge selector:
 // a max by, a presence test, a label lookup or a set operation.
-var replicaSafeBefore = regexp.MustCompile(`(max by \([^)]*\) \(|present_over_time\(|label_values\(|unless on \([^)]*\) )$`)
+var replicaSafeBefore = regexp.MustCompile(`(max by \([^)]*\) \((max_over_time\()?|present_over_time\(|label_values\(|unless on \([^)]*\) )$`)
 
 func TestGaugesAreTakenOncePerLane(t *testing.T) {
 	check := func(where, expr string) {
