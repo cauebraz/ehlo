@@ -15,7 +15,7 @@ log_hooks:new_json {
 }
 ```
 
-`new_json` sends each record as its own JSON object and sets no custom header, so the token travels in the query string. Read it from your secret store when you build the URL.
+`new_json` sends each record as its own JSON object and sets no custom header, so the token travels in the query string, where proxy access logs record it. Read it from your secret store when you build the URL, or use the batched hook below, which sends it in the `Authorization` header.
 
 ## Batched
 
@@ -30,13 +30,15 @@ log_hooks:new {
   constructor = function(domain, tenant, campaign)
     local connection = {}
     local client = kumo.http.build_client {}
+    local token = (kumo.secrets.load '/etc/kumomta/ehlo-token'):gsub('%s+$', '')
     function connection:send_batch(messages)
       local payload = {}
       for _, msg in ipairs(messages) do
         table.insert(payload, msg:get_meta 'log_record')
       end
       local response = client
-        :post('https://ehlo.example.com/v1/webhooks/kumomta?token=REPLACE_WITH_TOKEN')
+        :post('https://ehlo.example.com/v1/webhooks/kumomta')
+        :bearer_auth(token)
         :header('Content-Type', 'application/json')
         :body(kumo.serde.json_encode(payload))
         :send()
@@ -58,6 +60,8 @@ log_hooks:new {
 }
 ```
 
+The hook reads the token from `/etc/kumomta/ehlo-token` with [`kumo.secrets.load`](https://docs.kumomta.com/reference/kumo.secrets/load/), which also takes a Vault path, and sends it as `Authorization: Bearer`, so it stays out of access logs.
+
 `send_batch` retries a batch on a 5xx, 429, 401 or 403 answer with `kumo.reject(400, ...)`, and on a network error, which raises a Lua error; KumoMTA retries each record later, until it expires ([webhooks guide](https://docs.kumomta.com/userguide/operation/webhooks/)). A 401 or 403 means a wrong token, which an operator fixes, so the records wait instead of being lost. Any other 4xx means ehlo will refuse the same batch again: 400 for a malformed batch or one with no valid event, 413 for a batch over a limit. `kumo.reject(500, ...)` drops it, and KumoMTA logs a `Bounce` for each record with ehlo's answer as the response. The `new_json` helper drops on every failure.
 
 Give the hook's queue its own shaping entry, as the KumoMTA webhook guide says, so delivery limits for mail do not slow it:
@@ -71,7 +75,7 @@ max_deliveries_per_connection = 100000
 
 ## Source
 
-`egress_source` becomes the ehlo `source`. With more than `max_sources` (256) egress sources, add `&source=egress_pool` to the URL so each pool is one source, or raise `max_sources`. Names must be 1-64 letters, digits, `.`, `_`, `:` or `-`. A record without the chosen field gives no events: `OOB` records never count, `Expiration` records count only with `&source=egress_pool`, and complaints need the trace setup in [docs/integrations.md](../../docs/integrations.md#attribute-kumomta-complaints).
+`egress_source` becomes the ehlo `source`. With more than `max_sources` (256) egress sources, add the query parameter `source=egress_pool` to the URL so each pool is one source, or raise `max_sources`. Names must be 1-64 letters, digits, `.`, `_`, `:` or `-`. A record without the chosen field gives no events: `OOB` records never count, `Expiration` records count only with `source=egress_pool`, and complaints need the trace setup in [docs/integrations.md](../../docs/integrations.md#attribute-kumomta-complaints).
 
 ## Try it
 

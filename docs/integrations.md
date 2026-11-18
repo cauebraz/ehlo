@@ -37,11 +37,11 @@ The unit runs `journalctl --follow --lines=0 --output=short-iso --unit="postfix*
 ## KumoMTA
 
 1. Set `webhooks.token` (or `webhooks.token_file`) in the ehlo config.
-2. Add a log hook to KumoMTA's `init.lua` that posts to `https://<ehlo>/v1/webhooks/kumomta?token=<token>`: [examples/kumomta/README.md](../examples/kumomta/README.md) has a one-record and a batched hook.
+2. Add a log hook to KumoMTA's `init.lua` that posts to `https://<ehlo>/v1/webhooks/kumomta`: [examples/kumomta/README.md](../examples/kumomta/README.md) has a one-record hook, which sends the token as `?token=<token>`, and a batched hook, which sends it as `Authorization: Bearer <token>` and keeps it out of access logs.
 3. Give the hook's queue its own shaping entry.
-4. With more than 256 egress sources, add `&source=egress_pool` or raise `max_sources`.
+4. With more than 256 egress sources, add the query parameter `source=egress_pool` or raise `max_sources`.
 
-Events keep route `self_hosted`, so KumoMTA lanes get warmup limits like Postfix ones. A record without the source field (`egress_source`, or `egress_pool` with `&source=egress_pool`) gives no events, so ehlo never creates a lane the attempts do not use. KumoMTA logs `OOB` records with neither field, so out-of-band bounces are not counted. `Expiration` records name only `egress_pool` and count with `&source=egress_pool`. KumoMTA does not log whether the peer certificate was verified, so ehlo counts no TLS sessions from it.
+Events keep route `self_hosted`, so KumoMTA lanes get warmup limits like Postfix ones. A record without the source field (`egress_source`, or `egress_pool` with `source=egress_pool`) gives no events, so ehlo never creates a lane the attempts do not use. KumoMTA logs `OOB` records with neither field, so out-of-band bounces are not counted. `Expiration` records name only `egress_pool` and count with `source=egress_pool`. KumoMTA does not log whether the peer certificate was verified, so ehlo counts no TLS sessions from it.
 
 ### Attribute KumoMTA complaints
 
