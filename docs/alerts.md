@@ -15,6 +15,8 @@ What every alert carries:
 
 Thresholds on SMTP replies apply to the `self_hosted` route. EhloIngestInvalidEvents, EhloProviderRateLimiting, EhloReputationBlock, EhloHardBounceRateHigh and EhloConnectionFailures also need at least 5 matching events in the last 10 minutes, so one reply on a lane with little traffic does not fire them.
 
+ehlo creates the series of a source absent from `sources` with its first event, and `rate()` and `increase()` skip the first sample of a series. The ratios and counts behind EhloDKIMUnsigned, EhloProviderRateLimiting, EhloAuthenticationRejected, EhloReputationBlock, EhloHardBounceRateHigh, EhloConnectionFailures, EhloComplaintRateHigh and EhloDMARCUnauthenticatedSource therefore count the whole value of a series that did not exist at the start of their window, so one burst of replies or the first complaints of such a source still fire them. This applies only when Prometheus scraped the same `job` and `instance` at the start of the window: a new Prometheus, or a target with a new `instance`, counts only increases after its first scrape, so it does not read ehlo's lifetime totals as new.
+
 ## EhloTelemetryAbsent
 
 Critical. A target that exported `ehlo_build_info` in the last day has failed its scrape for 1 minute, or no target exports ehlo series at all. No other alert can fire until this clears. The alert does not depend on the job name. With `group_by` labels such as `cluster`, the second case becomes a group that exported ehlo series in the last day and exports none now, so the alert keeps the label it is routed on; it resolves a day after the group's last series, for example after a cluster is removed.
@@ -115,6 +117,6 @@ Critical. The warmup engine stopped a lane after reputation block replies reache
 
 ## EhloDMARCUnauthenticatedSource
 
-Warning. DMARC reports from the last day show mail from a source that failed both SPF and DKIM. Either a service sends as your domain without SPF or DKIM set up, or someone spoofs the domain. A source seen for the first time, such as a spoofing IP absent from the config, alerts on its first rows: when its series is newer than the day, the alert counts its whole value. EhloAuthenticationRejected does the same over 10 minutes for a source absent from the config.
+Warning. DMARC reports from the last day show mail from a source that failed both SPF and DKIM. Either a service sends as your domain without SPF or DKIM set up, or someone spoofs the domain. A source seen for the first time, such as a spoofing IP absent from the config, alerts on its first rows.
 
 Set up the service, or confirm the domain publishes `p=reject`.

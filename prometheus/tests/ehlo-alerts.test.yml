@@ -511,15 +511,15 @@ tests:
               runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlofeedbackfeedstale
               dashboard_uid: ehlo-pipeline
 
-  - name: a source outside the config alerts on its first auth failures and dmarc rows
+  - name: a source outside the config alerts on its first auth failures
     interval: 1m
     input_series:
-      - series: 'ehlo_reply_categories_total{route="self_hosted", source="mx-9", provider="gmail", category="auth_failure", instance="ehlo:8080"}'
-        values: '_x5 15x20'
-      - series: 'ehlo_dmarc_messages_total{source="203.0.113.50", spf="fail", dkim="fail", instance="ehlo:8080"}'
-        values: '_x5 40x20'
+      - series: 'ehlo_build_info{job="ehlo", instance="ehlo:8080", version="v1.0.0"}'
+        values: '1x30'
+      - series: 'ehlo_reply_categories_total{route="self_hosted", source="mx-9", provider="gmail", category="auth_failure", job="ehlo", instance="ehlo:8080"}'
+        values: '_x12 15x18'
     alert_rule_test:
-      - eval_time: 8m
+      - eval_time: 15m
         alertname: EhloAuthenticationRejected
         exp_alerts:
           - exp_labels:
@@ -532,7 +532,16 @@ tests:
               description: "15 replies in 10 minutes. First check the DNS records, the DKIM signer and the PTR of the sending IP of mx-9. Do not suppress the recipients."
               runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloauthenticationrejected
               dashboard_uid: ehlo-reputation
-      - eval_time: 8m
+
+  - name: a source outside the config alerts on its first dmarc rows
+    interval: 1h
+    input_series:
+      - series: 'ehlo_build_info{job="ehlo", instance="ehlo:8080", version="v1.0.0"}'
+        values: '1x30'
+      - series: 'ehlo_dmarc_messages_total{source="203.0.113.50", spf="fail", dkim="fail", job="ehlo", instance="ehlo:8080"}'
+        values: '_x26 40x4'
+    alert_rule_test:
+      - eval_time: 27h
         alertname: EhloDMARCUnauthenticatedSource
         exp_alerts:
           - exp_labels:
@@ -544,6 +553,74 @@ tests:
               description: "40 messages in the last day. Either a service sends as your domain without SPF or DKIM set up, or someone spoofs the domain. First identify the sending IPs in the report."
               runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlodmarcunauthenticatedsource
               dashboard_uid: ehlo-reputation
+
+  - name: one burst of block replies on a source outside the config
+    interval: 15s
+    input_series:
+      - series: 'ehlo_build_info{job="ehlo", instance="ehlo:8080", version="v1.0.0"}'
+        values: '1x100'
+      - series: 'ehlo_reply_categories_total{route="self_hosted", source="kumo-1", provider="outlook", category="reputation_block", job="ehlo", instance="ehlo:8080"}'
+        values: '_x50 20x50'
+      - series: 'ehlo_smtp_attempts_total{route="self_hosted", source="kumo-1", provider="outlook", attempt="first", job="ehlo", instance="ehlo:8080"}'
+        values: '_x50 100x50'
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: EhloReputationBlock
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: critical
+              source: kumo-1
+              provider: outlook
+              category: reputation_block
+            exp_annotations:
+              summary: outlook blocks kumo-1 for reputation (20% of attempts)
+              description: "The warmup engine stops the lane until the next day. First request delisting from outlook with the URL or code in the reply text. Do not retry 5xx replies."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloreputationblock
+              dashboard_uid: ehlo-reputation
+
+  - name: the first complaints of a source outside the config count
+    interval: 5m
+    input_series:
+      - series: 'ehlo_build_info{job="ehlo", instance="ehlo:8080", version="v1.0.0"}'
+        values: '1x300'
+      - series: 'ehlo_complaints_total{route="self_hosted", source="kumo-3", provider="gmail", job="ehlo", instance="ehlo:8080"}'
+        values: '_x288 4x3 5x20'
+      - series: 'ehlo_delivered_total{route="self_hosted", source="kumo-3", provider="gmail", job="ehlo", instance="ehlo:8080"}'
+        values: '_x288 1000+10x23'
+    alert_rule_test:
+      - eval_time: 25h
+        alertname: EhloComplaintRateHigh
+        exp_alerts:
+          - exp_labels:
+              component: ehlo
+              severity: critical
+              source: kumo-3
+              provider: gmail
+            exp_annotations:
+              summary: Recipients at gmail report 0.4464% of mail from kumo-3 as spam
+              description: "Gmail's published guidance, used here for every provider: stay below 0.1% and never reach 0.3%. If every server rises together, the content or the list is the cause: first stop the campaign."
+              runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlocomplaintratehigh
+              dashboard_uid: ehlo-reputation
+
+  - name: a new Prometheus does not count the lifetime totals of ehlo as new
+    interval: 15s
+    input_series:
+      - series: 'ehlo_build_info{job="ehlo", instance="ehlo:8080", version="v1.0.0"}'
+        values: '1x60'
+      - series: 'ehlo_reply_categories_total{route="self_hosted", source="mx-1", provider="gmail", category="auth_failure", job="ehlo", instance="ehlo:8080"}'
+        values: '30x60'
+      - series: 'ehlo_reply_categories_total{route="self_hosted", source="mx-1", provider="outlook", category="reputation_block", job="ehlo", instance="ehlo:8080"}'
+        values: '500x60'
+      - series: 'ehlo_smtp_attempts_total{route="self_hosted", source="mx-1", provider="outlook", attempt="first", job="ehlo", instance="ehlo:8080"}'
+        values: '9000+10x60'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: EhloAuthenticationRejected
+        exp_alerts: []
+      - eval_time: 9m
+        alertname: EhloReputationBlock
+        exp_alerts: []
 
   - name: connection failures above half of the attempts
     interval: 15s

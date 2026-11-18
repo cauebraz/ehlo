@@ -87,7 +87,7 @@ groups:
         expr: |-
           ehlo:category:ratio_rate10m{category="rate_limited"} > 0.05
           and on (source, provider)
-          sum by (source, provider) (increase(ehlo_reply_categories_total{route="self_hosted", category="rate_limited"}[10m])) >= 5
+          sum by (source, provider) ((ehlo_reply_categories_total{route="self_hosted", category="rate_limited"} unless ehlo_reply_categories_total{route="self_hosted", category="rate_limited"} offset 10m and on (job, instance) ehlo_build_info offset 10m) or increase(ehlo_reply_categories_total{route="self_hosted", category="rate_limited"}[10m])) >= 5
         for: 2m
         keep_firing_for: 10m
         labels:
@@ -99,13 +99,7 @@ groups:
           runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehloproviderratelimiting
           dashboard_uid: ehlo-delivery
       - alert: EhloAuthenticationRejected
-        expr: |-
-          sum by (source, provider) (
-              (ehlo_reply_categories_total{route="self_hosted", category="auth_failure"}
-                unless ehlo_reply_categories_total{route="self_hosted", category="auth_failure"} offset 10m)
-            or
-              increase(ehlo_reply_categories_total{route="self_hosted", category="auth_failure"}[10m])
-          ) > 0
+        expr: sum by (source, provider) ((ehlo_reply_categories_total{route="self_hosted", category="auth_failure"} unless ehlo_reply_categories_total{route="self_hosted", category="auth_failure"} offset 10m and on (job, instance) ehlo_build_info offset 10m) or increase(ehlo_reply_categories_total{route="self_hosted", category="auth_failure"}[10m])) > 0
         for: 2m
         labels:
           component: ehlo
@@ -119,7 +113,7 @@ groups:
         expr: |-
           ehlo:category:ratio_rate10m{category="reputation_block"} > 0.01
           and on (source, provider)
-          sum by (source, provider) (increase(ehlo_reply_categories_total{route="self_hosted", category="reputation_block"}[10m])) >= 5
+          sum by (source, provider) ((ehlo_reply_categories_total{route="self_hosted", category="reputation_block"} unless ehlo_reply_categories_total{route="self_hosted", category="reputation_block"} offset 10m and on (job, instance) ehlo_build_info offset 10m) or increase(ehlo_reply_categories_total{route="self_hosted", category="reputation_block"}[10m])) >= 5
         for: 2m
         keep_firing_for: 10m
         labels:
@@ -134,7 +128,7 @@ groups:
         expr: |-
           ehlo:hard_bounce:ratio_rate10m{route="self_hosted"} > 0.025
           and on (route, source, provider)
-          sum by (route, source, provider) (increase(ehlo_bounces_total{route="self_hosted", kind="hard"}[10m])) >= 5
+          sum by (route, source, provider) ((ehlo_bounces_total{route="self_hosted", kind="hard"} unless ehlo_bounces_total{route="self_hosted", kind="hard"} offset 10m and on (job, instance) ehlo_build_info offset 10m) or increase(ehlo_bounces_total{route="self_hosted", kind="hard"}[10m])) >= 5
         for: 10m
         labels:
           component: ehlo
@@ -165,7 +159,7 @@ groups:
         expr: |-
           ehlo:connect_failure:ratio_rate10m > 0.5
           and on (source, provider)
-          sum by (source, provider) (increase(ehlo_smtp_connect_failures_total{route="self_hosted"}[10m])) >= 5
+          sum by (source, provider) ((ehlo_smtp_connect_failures_total{route="self_hosted"} unless ehlo_smtp_connect_failures_total{route="self_hosted"} offset 10m and on (job, instance) ehlo_build_info offset 10m) or increase(ehlo_smtp_connect_failures_total{route="self_hosted"}[10m])) >= 5
         for: 2m
         labels:
           component: ehlo
@@ -208,10 +202,10 @@ groups:
           dashboard_uid: ehlo-delivery
       - alert: EhloComplaintRateHigh
         expr: |-
-          sum by (source, provider) (increase(ehlo_complaints_total{route="self_hosted"}[24h]))
-            / sum by (source, provider) (increase(ehlo_delivered_total{route="self_hosted"}[24h])) > 0.003
+          sum by (source, provider) ((ehlo_complaints_total{route="self_hosted"} unless ehlo_complaints_total{route="self_hosted"} offset 24h and on (job, instance) ehlo_build_info offset 24h) or increase(ehlo_complaints_total{route="self_hosted"}[24h]))
+            / sum by (source, provider) ((ehlo_delivered_total{route="self_hosted"} unless ehlo_delivered_total{route="self_hosted"} offset 24h and on (job, instance) ehlo_build_info offset 24h) or increase(ehlo_delivered_total{route="self_hosted"}[24h])) > 0.003
           and on (source, provider)
-          sum by (source, provider) (increase(ehlo_complaints_total{route="self_hosted"}[24h])) >= 5
+          sum by (source, provider) ((ehlo_complaints_total{route="self_hosted"} unless ehlo_complaints_total{route="self_hosted"} offset 24h and on (job, instance) ehlo_build_info offset 24h) or increase(ehlo_complaints_total{route="self_hosted"}[24h])) >= 5
         for: 15m
         labels:
           component: ehlo
@@ -242,12 +236,7 @@ groups:
           runbook_url: https://github.com/cauebraz/ehlo/blob/main/docs/alerts.md#ehlowarmuplaneblocked
           dashboard_uid: ehlo-warmup
       - alert: EhloDMARCUnauthenticatedSource
-        expr: |-
-          sum by (source) (
-              (ehlo_dmarc_messages_total{spf="fail", dkim="fail"} unless ehlo_dmarc_messages_total{spf="fail", dkim="fail"} offset 1d)
-            or
-              increase(ehlo_dmarc_messages_total{spf="fail", dkim="fail"}[1d])
-          ) > 0
+        expr: sum by (source) ((ehlo_dmarc_messages_total{spf="fail", dkim="fail"} unless ehlo_dmarc_messages_total{spf="fail", dkim="fail"} offset 1d and on (job, instance) ehlo_build_info offset 1d) or increase(ehlo_dmarc_messages_total{spf="fail", dkim="fail"}[1d])) > 0
         labels:
           component: ehlo
           severity: warning

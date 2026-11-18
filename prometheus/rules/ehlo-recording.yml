@@ -13,12 +13,12 @@ groups:
           sum by (source, provider) (rate(ehlo_smtp_attempts_total{route="self_hosted"}[10m]))
       - record: ehlo:connect_failure:ratio_rate10m
         expr: |-
-          sum by (source, provider) (rate(ehlo_smtp_connect_failures_total{route="self_hosted"}[10m]))
-            / sum by (source, provider) (rate(ehlo_smtp_attempts_total{route="self_hosted"}[10m]))
+          sum by (source, provider) ((ehlo_smtp_connect_failures_total{route="self_hosted"} unless ehlo_smtp_connect_failures_total{route="self_hosted"} offset 10m and on (job, instance) ehlo_build_info offset 10m) / 600 or rate(ehlo_smtp_connect_failures_total{route="self_hosted"}[10m]))
+            / sum by (source, provider) ((ehlo_smtp_attempts_total{route="self_hosted"} unless ehlo_smtp_attempts_total{route="self_hosted"} offset 10m and on (job, instance) ehlo_build_info offset 10m) / 600 or rate(ehlo_smtp_attempts_total{route="self_hosted"}[10m]))
       - record: ehlo:complaint:ratio_rate10m
         expr: |-
-          sum by (route, source, provider) (rate(ehlo_complaints_total[10m]))
-            / sum by (route, source, provider) (rate(ehlo_delivered_total[10m]))
+          sum by (route, source, provider) ((ehlo_complaints_total unless ehlo_complaints_total offset 10m and on (job, instance) ehlo_build_info offset 10m) / 600 or rate(ehlo_complaints_total[10m]))
+            / sum by (route, source, provider) ((ehlo_delivered_total unless ehlo_delivered_total offset 10m and on (job, instance) ehlo_build_info offset 10m) / 600 or rate(ehlo_delivered_total[10m]))
       - record: ehlo:bounce:ratio_rate10m
         expr: |-
           sum by (route, kind) (rate(ehlo_bounces_total[10m]))
@@ -34,16 +34,16 @@ groups:
             / sum by (route) (rate(ehlo_delivered_total[10m]))
       - record: ehlo:dkim_unsigned:ratio_rate10m
         expr: |-
-          sum by (source) (rate(ehlo_dkim_messages_total{result="unsigned"}[10m]))
-            / sum by (source) (rate(ehlo_dkim_messages_total{result!="unknown"}[10m]))
+          sum by (source) ((ehlo_dkim_messages_total{result="unsigned"} unless ehlo_dkim_messages_total{result="unsigned"} offset 10m and on (job, instance) ehlo_build_info offset 10m) / 600 or rate(ehlo_dkim_messages_total{result="unsigned"}[10m]))
+            / sum by (source) ((ehlo_dkim_messages_total{result!="unknown"} unless ehlo_dkim_messages_total{result!="unknown"} offset 10m and on (job, instance) ehlo_build_info offset 10m) / 600 or rate(ehlo_dkim_messages_total{result!="unknown"}[10m]))
       - record: ehlo:category:ratio_rate10m
         expr: |-
-          sum by (source, provider, category) (rate(ehlo_reply_categories_total{route="self_hosted", category!="delivered"}[10m]))
+          sum by (source, provider, category) ((ehlo_reply_categories_total{route="self_hosted", category!="delivered"} unless ehlo_reply_categories_total{route="self_hosted", category!="delivered"} offset 10m and on (job, instance) ehlo_build_info offset 10m) / 600 or rate(ehlo_reply_categories_total{route="self_hosted", category!="delivered"}[10m]))
             / ignoring (category) group_left
-          sum by (source, provider) (rate(ehlo_smtp_attempts_total{route="self_hosted"}[10m]))
+          sum by (source, provider) ((ehlo_smtp_attempts_total{route="self_hosted"} unless ehlo_smtp_attempts_total{route="self_hosted"} offset 10m and on (job, instance) ehlo_build_info offset 10m) / 600 or rate(ehlo_smtp_attempts_total{route="self_hosted"}[10m]))
       - record: ehlo:hard_bounce:ratio_rate10m
         expr: |-
-          sum by (route, source, provider) (rate(ehlo_bounces_total{kind="hard"}[10m]))
-            / sum by (route, source, provider) (rate(ehlo_smtp_attempts_total{attempt="first"}[10m]))
+          sum by (route, source, provider) ((ehlo_bounces_total{kind="hard"} unless ehlo_bounces_total{kind="hard"} offset 10m and on (job, instance) ehlo_build_info offset 10m) / 600 or rate(ehlo_bounces_total{kind="hard"}[10m]))
+            / sum by (route, source, provider) ((ehlo_smtp_attempts_total{attempt="first"} unless ehlo_smtp_attempts_total{attempt="first"} offset 10m and on (job, instance) ehlo_build_info offset 10m) / 600 or rate(ehlo_smtp_attempts_total{attempt="first"}[10m]))
       - record: ehlo:feed_age_seconds
         expr: time() - max by (route, type) (max_over_time(ehlo_route_last_event_timestamp_seconds[1d]))
