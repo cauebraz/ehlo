@@ -4,8 +4,9 @@
 #   ehlo-chart-VERSION.tgz                    Helm chart, image pinned to IMAGE_DIGEST
 #   ehlo-monitoring-bundle_VERSION.tar.gz     ehlo-monitoring render -format all, default config
 #   ehlo-dashboards-classic_VERSION.tar.gz    classic dashboards from scripts/export-classic.sh
-# Tarballs are reproducible for a given commit: sorted names, the commit
-# time as mtime, owner 0, gzip without a name or time.
+# Every file is reproducible for a given commit: the tarballs have sorted
+# names, the commit time as mtime, owner 0 and gzip without a name or time;
+# helm package takes the commit time from SOURCE_DATE_EPOCH.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -38,7 +39,7 @@ grep -q "^  digest: \"$digest\"$" "$work/chart/values.yaml" || { echo "image.dig
 sed -i.bak -e 's|^version: 0\.0\.0$|version: '"$version"'|' -e 's|^appVersion: "0\.0\.0"$|appVersion: "'"$version"'"|' "$work/chart/Chart.yaml" && rm "$work/chart/Chart.yaml.bak"
 grep -q "^appVersion: \"$version\"$" "$work/chart/Chart.yaml" || { echo "appVersion not set in Chart.yaml" >&2; exit 1; }
 deploy/scripts/helm.sh lint "$work/chart" --strict
-deploy/scripts/helm.sh package "$work/chart" --version "$version" --app-version "$version" -d "$work"
+SOURCE_DATE_EPOCH=$epoch deploy/scripts/helm.sh package "$work/chart" --version "$version" --app-version "$version" -d "$work"
 mv "$work/ehlo-$version.tgz" "$out/ehlo-chart-$version.tgz"
 deploy/scripts/helm.sh template ehlo "$out/ehlo-chart-$version.tgz" | grep -q "image: ghcr.io/cauebraz/ehlo:$version@$digest" \
     || { echo "packaged chart does not reference ghcr.io/cauebraz/ehlo:$version@$digest" >&2; exit 1; }
