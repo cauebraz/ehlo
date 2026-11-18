@@ -41,13 +41,20 @@ docker logs ehlo-vector-test-powermta 2>&1 | grep -iE 'error|warn' | grep -v unu
 docker logs ehlo-vector-test-json 2>&1 | grep -iE 'error|warn' | grep -v unused_expression || true
 metrics="$(curl -fsS "http://127.0.0.1:$port/metrics")"
 grep -E '^ehlo_(events_total|smtp_attempts_total|smtp_replies_total|bounces_total|complaints_total)\{' <<<"$metrics" | grep -v ' 0$'
-want='ehlo_events_total{result="accepted",type="attempt"} 11
+want='ehlo_events_total{result="accepted",type="attempt"} 12
 ehlo_events_total{result="accepted",type="bounce"} 5
 ehlo_events_total{result="accepted",type="complaint"} 2
-ehlo_events_total{result="accepted",type="reply"} 11'
+ehlo_events_total{result="accepted",type="reply"} 12'
 got="$(grep -E '^ehlo_events_total\{' <<<"$metrics" | grep -v ' 0$')"
 if [[ "$got" != "$want" ]]; then
   printf 'FAIL: event totals differ\nwant:\n%s\ngot:\n%s\n' "$want" "$got"
+  exit 1
+fi
+want='ehlo_smtp_attempts_total{attempt="first",provider="gmail",route="self_hosted",source="vmta-2"} 2
+ehlo_smtp_attempts_total{attempt="retry",provider="yahoo",route="self_hosted",source="vmta-1"} 1'
+got="$(grep -E '^ehlo_smtp_attempts_total\{attempt="(first",provider="gmail",route="self_hosted",source="vmta-2|retry",provider="yahoo",route="self_hosted",source="vmta-1)"\}' <<<"$metrics")"
+if [[ "$got" != "$want" ]]; then
+  printf 'FAIL: PowerMTA first and retry attempts differ\nwant:\n%s\ngot:\n%s\n' "$want" "$got"
   exit 1
 fi
 echo "PASS: both Vector examples posted the expected events"

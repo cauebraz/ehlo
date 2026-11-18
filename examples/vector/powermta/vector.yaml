@@ -45,7 +45,17 @@ transforms:
       if delay < 0 { delay = 0.0 }
       base = {"v": 1, "time": logged, "source": src, "domain": domain}
       att = merge(base, {"type": "attempt", "attempt": "first"})
-      if delay >= 60 { att.attempt = "retry" }
+      first_str = ""
+      if length(c) > 10 { first_str = string(c[10]) ?? "" }
+      if first_str != "" {
+        first = logged
+        if match(first_str, r'^\d+$') {
+          first = from_unix_timestamp(to_int(first_str) ?? 0) ?? logged
+        } else {
+          first = parse_timestamp(first_str, "%Y-%m-%d %H:%M:%S%z") ?? parse_timestamp(first_str, "%m/%d/%Y %H:%M:%S%z") ?? logged
+        }
+        if to_unix_timestamp(logged) - to_unix_timestamp(first) >= 60 { att.attempt = "retry" }
+      }
       reply = merge(base, {"type": "reply", "text": truncate(text, 128), "delay": delay})
       if code == 0 {
         reply.stage = "connect"

@@ -76,7 +76,7 @@ For messages injected over HTTP, set the meta in `http_message_generated` and pa
 2. Install Vector 0.62.0 and copy [examples/vector/powermta/vector.yaml](../examples/vector/powermta/vector.yaml); set `uri` to your ehlo.
 3. Start Vector. It reads the accounting files from their end and posts NDJSON to `/v1/events`.
 
-The field mapping follows the PowerMTA 5.0 User's Guide and is not verified against a running PowerMTA.
+The field mapping follows the PowerMTA 5.0 User's Guide and is not verified against a running PowerMTA. The `timeFirstAttempt` field, which tells a retry from a first attempt that waited in a throttled queue, comes from an unofficial 5.5 field list; without it every attempt counts against the warmup limit ([details](../examples/vector/README.md#powermta)).
 
 ## Any MTA through the HTTP API
 

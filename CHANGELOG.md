@@ -43,6 +43,7 @@ First version.
 - `POST /v1/webhooks/kumomta` takes KumoMTA log records (one object, an array or NDJSON) on route `self_hosted`, with `?source=egress_pool` to group by pool. A request yields at most 10,000 events (413 above). Records without the chosen source field give no events: `OOB` never counts, `Expiration` counts with `?source=egress_pool`, and complaints count when the egress source is in the `X-KumoRef` trace meta.
 - `providers_extra` adds domain rules after the built-in list instead of replacing it. Provider rules are validated at start.
 - `webhooks.token_file` and `webhooks.sendgrid_public_key_file` read the webhook secrets from files, such as mounted Kubernetes Secret keys.
+- The PowerMTA Vector example tells a retry from a first attempt by `timeFirstAttempt`, so first attempts that waited in a throttled queue count against the warmup limit. Without the field every attempt counts.
 - `docs/integrations.md` and `examples/`: systemd units for `ehlo serve` and the Postfix tailer (journald and `/var/log/mail.log`), KumoMTA log hooks, and Vector configs for PowerMTA accounting files and JSON MTA logs.
 - `ehlo tail-postfix` is tested on `journalctl -o short-iso` lines.
 

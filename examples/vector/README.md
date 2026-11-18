@@ -21,13 +21,13 @@ PASS: both Vector examples posted the expected events
 
 The mapping follows the accounting file chapter of the PowerMTA 5.0 User's Guide (an unofficial copy is at https://jnotes.github.io/pmta-doc; the official guide needs a vendor login). It is not verified against a running PowerMTA. Check the header line of your file against the column list below before relying on it.
 
-Add an accounting file for ehlo next to your existing ones, with the same fields for `d`, `b` and `t`, and a second one for feedback loop reports:
+Add an accounting file for ehlo next to your existing ones, with the same fields for `d`, `b` and `t` plus `timeFirstAttempt` on `d` and `b`, and a second one for feedback loop reports:
 
 ```
 <acct-file /var/log/pmta/ehlo-acct.csv>
     records d, b, t
-    record-fields d timeLogged,timeQueued,rcpt,dsnStatus,dsnDiag,dsnMta,bounceCat,dlvSourceIp,vmta
-    record-fields b timeLogged,timeQueued,rcpt,dsnStatus,dsnDiag,dsnMta,bounceCat,dlvSourceIp,vmta
+    record-fields d timeLogged,timeQueued,rcpt,dsnStatus,dsnDiag,dsnMta,bounceCat,dlvSourceIp,vmta,timeFirstAttempt
+    record-fields b timeLogged,timeQueued,rcpt,dsnStatus,dsnDiag,dsnMta,bounceCat,dlvSourceIp,vmta,timeFirstAttempt
     record-fields t timeLogged,timeQueued,rcpt,dsnStatus,dsnDiag,dsnMta,bounceCat,dlvSourceIp,vmta
     move-interval 1d
     max-size 250M
@@ -40,7 +40,7 @@ Add an accounting file for ehlo next to your existing ones, with the same fields
 </acct-file>
 ```
 
-The transform reads columns by position: `type,timeLogged,timeQueued,rcpt,dsnStatus,dsnDiag,dsnMta,bounceCat,dlvSourceIp,vmta` and, for the feedback file, `type,timeLogged,feedbackType,rcpt`. It skips the header line PowerMTA writes at the start of each file. Timestamps may be `2026-03-10 08:15:02+0000`, `03/10/2026 08:15:02+0000` or Unix seconds.
+The transform reads columns by position: `type,timeLogged,timeQueued,rcpt,dsnStatus,dsnDiag,dsnMta,bounceCat,dlvSourceIp,vmta`, an optional `timeFirstAttempt`, and, for the feedback file, `type,timeLogged,feedbackType,rcpt`. It skips the header line PowerMTA writes at the start of each file. Timestamps may be `2026-03-10 08:15:02+0000`, `03/10/2026 08:15:02+0000` or Unix seconds.
 
 | Record | Events |
 |--------|--------|
@@ -51,7 +51,7 @@ The transform reads columns by position: `type,timeLogged,timeQueued,rcpt,dsnSta
 
 - `source` is `vmta`, else `dlvSourceIp`, else `powermta`.
 - `code` comes from `dsnDiag` (`smtp;421 ...`), `enhanced` from `dsnStatus` (`4.7.0 (...)`), `text` from `dsnDiag` cut to 128 characters.
-- `attempt` is `retry` when the message waited 60 seconds or more between `timeQueued` and `timeLogged`. Unlike `ehlo tail-postfix -retry-after`, which reads only the time before the last active queue entry, this also counts the time a first attempt waited in a throttled PowerMTA queue, so such attempts become `retry`.
+- `attempt` is `retry` when `timeLogged` is 60 seconds or more after `timeFirstAttempt`, so an earlier attempt of the same message failed. Time a first attempt waited in a throttled queue does not count, so it stays `first` and counts against the warmup limit. `timeFirstAttempt` is not in the PowerMTA 5.0 guide; an unofficial copy of the 5.5 field list (https://hackmd.io/@z3d3m0n/Pmta_records) has it on `d` and `b` records only. If your version rejects the field, remove it from `record-fields`. Without it, and for every `t` record, the attempt is `first`: retries then count against the limit too, so the lane stays at or below it.
 - `bounce` is `policy` for `policy-related`, `spam-related`, `content-related`, `invalid-sender` or a `5.7.x` status, `soft` for `message-expired` or a `4.x.x` status, else `hard`.
 - Feedback records name no VirtualMTA, so complaints land on source `powermta`, not on the lane that sent the message.
 

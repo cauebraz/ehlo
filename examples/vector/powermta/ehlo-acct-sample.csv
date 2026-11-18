@@ -1,8 +1,9 @@
-type,timeLogged,timeQueued,rcpt,dsnStatus,dsnDiag,dsnMta,bounceCat,dlvSourceIp,vmta
-d,2026-03-10 08:15:02+0000,2026-03-10 08:15:01+0000,user1@gmail.com,2.0.0 (success),smtp;250 2.0.0 OK 1710058502 gsmtp,mx.gmail.example (203.0.113.26),,203.0.113.10,vmta-1
+type,timeLogged,timeQueued,rcpt,dsnStatus,dsnDiag,dsnMta,bounceCat,dlvSourceIp,vmta,timeFirstAttempt
+d,2026-03-10 08:15:02+0000,2026-03-10 08:15:01+0000,user1@gmail.com,2.0.0 (success),smtp;250 2.0.0 OK 1710058502 gsmtp,mx.gmail.example (203.0.113.26),,203.0.113.10,vmta-1,2026-03-10 08:15:02+0000
 t,2026-03-10 08:15:03+0000,2026-03-10 08:15:02+0000,user2@yahoo.com,4.7.0 (other or undefined security status),smtp;421 4.7.0 [TSS04] Messages from 203.0.113.10 temporarily deferred,mx.yahoo.example (203.0.113.27),policy-related,203.0.113.10,vmta-1
-d,2026-03-10 08:30:03+0000,2026-03-10 08:15:02+0000,user2@yahoo.com,2.0.0 (success),smtp;250 ok dirdel,mx.yahoo.example (203.0.113.27),,203.0.113.10,vmta-1
-b,2026-03-10 08:15:04+0000,2026-03-10 08:15:03+0000,user3@outlook.com,5.5.0 (other or undefined protocol status),smtp;550 5.5.0 Requested action not taken: mailbox unavailable,mx.outlook.example (203.0.113.28),bad-mailbox,203.0.113.10,vmta-1
-b,2026-03-10 08:15:05+0000,2026-03-10 08:15:04+0000,user4@gmail.com,5.7.1 (delivery not authorized),"smtp;550 5.7.1 Message rejected, see policy page",mx.gmail.example (203.0.113.26),spam-related,203.0.113.11,vmta-2
+d,2026-03-10 08:30:03+0000,2026-03-10 08:15:02+0000,user2@yahoo.com,2.0.0 (success),smtp;250 ok dirdel,mx.yahoo.example (203.0.113.27),,203.0.113.10,vmta-1,2026-03-10 08:15:03+0000
+b,2026-03-10 08:15:04+0000,2026-03-10 08:15:03+0000,user3@outlook.com,5.5.0 (other or undefined protocol status),smtp;550 5.5.0 Requested action not taken: mailbox unavailable,mx.outlook.example (203.0.113.28),bad-mailbox,203.0.113.10,vmta-1,2026-03-10 08:15:04+0000
+b,2026-03-10 08:15:05+0000,2026-03-10 08:15:04+0000,user4@gmail.com,5.7.1 (delivery not authorized),"smtp;550 5.7.1 Message rejected, see policy page",mx.gmail.example (203.0.113.26),spam-related,203.0.113.11,vmta-2,2026-03-10 08:15:05+0000
+d,2026-03-10 08:20:01+0000,2026-03-10 08:00:00+0000,user7@gmail.com,2.0.0 (success),smtp;250 2.0.0 OK 1710058801 gsmtp,mx.gmail.example (203.0.113.26),,203.0.113.11,vmta-2,2026-03-10 08:20:00+0000
 t,2026-03-10 08:15:06+0000,2026-03-10 08:15:05+0000,user5@outlook.com,4.4.1 (no answer from host),smtp;connect to 203.0.113.28: connection refused,,no-answer-from-host,,vmta-2
 b,2026-03-12 08:15:06+0000,2026-03-10 08:15:05+0000,user6@outlook.com,4.4.7 (delivery time expired),smtp;421 4.4.1 no answer from host,,message-expired,,vmta-2
